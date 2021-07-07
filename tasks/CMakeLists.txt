@@ -1,6 +1,10 @@
 # Generated from orogen/lib/orogen/templates/tasks/CMakeLists.txt
 
 include(comms_webrtcTaskLib)
+
+find_package(libdatachannel REQUIRED)
+include_directories(LibDatachannel::datachannel)
+
 ADD_LIBRARY(${COMMS_WEBRTC_TASKLIB_NAME} SHARED
     ${COMMS_WEBRTC_TASKLIB_SOURCES})
 add_dependencies(${COMMS_WEBRTC_TASKLIB_NAME}
@@ -10,6 +14,7 @@ add_dependencies(${COMMS_WEBRTC_TASKLIB_NAME}
 TARGET_LINK_LIBRARIES(${COMMS_WEBRTC_TASKLIB_NAME}
     ${OrocosRTT_LIBRARIES}
     ${QT_LIBRARIES}
+    LibDatachannel::datachannel
     ${COMMS_WEBRTC_TASKLIB_DEPENDENT_LIBRARIES})
 SET_TARGET_PROPERTIES(${COMMS_WEBRTC_TASKLIB_NAME}
     PROPERTIES LINK_INTERFACE_LIBRARIES "${COMMS_WEBRTC_TASKLIB_INTERFACE_LIBRARIES}")
