@@ -3,18 +3,23 @@
 #ifndef COMMS_WEBRTC_TASK_TASK_HPP
 #define COMMS_WEBRTC_TASK_TASK_HPP
 
+#include "base-logging/Logging.hpp"
 #include "comms_webrtc/TaskBase.hpp"
+#include "rtc/rtc.hpp"
+#include <json/json.h>
 
-namespace comms_webrtc{
+namespace comms_webrtc
+{
+    struct MessageDecoder;
 
     /*! \class Task
-     * \brief The task context provides and requires services. It uses an ExecutionEngine to perform its functions.
-     * Essential interfaces are operations, data flow ports and properties. These interfaces have been defined using the oroGen specification.
-     * In order to modify the interfaces you should (re)use oroGen and rely on the associated workflow.
-     * Declare a new task context (i.e., a component)
-
-The corresponding C++ class can be edited in tasks/Task.hpp and
-tasks/Task.cpp, and will be put in the comms_webrtc namespace.
+     * \brief The task context provides and requires services. It uses an ExecutionEngine
+     to perform its functions.
+     * Essential interfaces are operations, data flow ports and properties. These
+     interfaces have been defined using the oroGen specification.
+     * In order to modify the interfaces you should (re)use oroGen and rely on the
+     associated workflow.
+     *
      * \details
      * The name of a TaskContext is primarily defined via:
      \verbatim
@@ -22,25 +27,25 @@ tasks/Task.cpp, and will be put in the comms_webrtc namespace.
          task('custom_task_name','comms_webrtc::Task')
      end
      \endverbatim
-     *  It can be dynamically adapted when the deployment is called with a prefix argument.
+     *  It can be dynamically adapted when the deployment is called with a prefix
+     argument.
      */
     class Task : public TaskBase
     {
-	friend class TaskBase;
-    protected:
+        friend class TaskBase;
 
-
-
-    public:
+      protected:
+      public:
         /** TaskContext constructor for Task
-         * \param name Name of the task. This name needs to be unique to make it identifiable via nameservices.
-         * \param initial_state The initial TaskState of the TaskContext. Default is Stopped state.
+         * \param name Name of the task. This name needs to be unique to make it
+         * identifiable via nameservices. \param initial_state The initial TaskState of
+         * the TaskContext. Default is Stopped state.
          */
         Task(std::string const& name = "comms_webrtc::Task");
 
         /** Default deconstructor of Task
          */
-	~Task();
+        ~Task();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the
@@ -99,8 +104,30 @@ tasks/Task.cpp, and will be put in the comms_webrtc namespace.
          * before calling start() again.
          */
         void cleanupHook();
+
+      private:
+        std::shared_ptr<rtc::WebSocket> m_ws;
+        MessageDecoder* decoder = nullptr;
+        std::shared_ptr<rtc::DataChannel> tmpDc;
+        std::shared_ptr<rtc::PeerConnection> tmpPc;
+        std::string tmpPeerID;
+        Json::FastWriter fast;
+
+        void onOffer(std::shared_ptr<rtc::WebSocket> wws);
+        void onAnswer(std::shared_ptr<rtc::WebSocket> wws);
+        void onCandidate(std::shared_ptr<rtc::WebSocket> wws);
+        bool parseIncomingMessage(char const* data);
+        bool getTypeFromMessage(std::string& out_str);
+        bool getIdFromMessage(std::string& out_str);
+        bool getPeerIdFromMessage(std::string& out_str);
+        bool getDescriptionFromMessage(std::string& out_str);
+        bool getCandidateFromMessage(std::string& out_str);
+        bool getMidFromMessage(std::string& out_str);
+        // std::shared_ptr<rtc::PeerConnection> createPeerConnection(
+        //     const rtc::Configuration& config,
+        //     std::shared_ptr<rtc::WebSocket> wws,
+        //     std::string id);
     };
-}
+} // namespace comms_webrtc
 
 #endif
-
