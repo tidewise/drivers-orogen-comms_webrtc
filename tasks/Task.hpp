@@ -6,7 +6,7 @@
 #include "base-logging/Logging.hpp"
 #include "comms_webrtc/TaskBase.hpp"
 #include "rtc/rtc.hpp"
-#include <json/json.h>
+#include "json/json.h"
 
 namespace comms_webrtc
 {
@@ -106,27 +106,31 @@ namespace comms_webrtc
         void cleanupHook();
 
       private:
-        std::shared_ptr<rtc::WebSocket> m_ws;
+        std::shared_ptr<rtc::WebSocket> mWs;
         MessageDecoder* decoder = nullptr;
-        std::shared_ptr<rtc::DataChannel> tmpDc;
-        std::shared_ptr<rtc::PeerConnection> tmpPc;
-        std::string tmpPeerID;
-        Json::FastWriter fast;
+        std::shared_ptr<rtc::DataChannel> mDataChannel;
+        std::shared_ptr<rtc::PeerConnection> mPeerConnection;
+        std::unordered_map<std::string, std::shared_ptr<rtc::PeerConnection>>
+            mPeerConnectionMap;
+        std::unordered_map<std::string, std::shared_ptr<rtc::DataChannel>>
+            mDataChannelMap;
 
-        void onOffer(std::shared_ptr<rtc::WebSocket> wws);
+        void onOffer(
+            rtc::Configuration const& config,
+            std::shared_ptr<rtc::WebSocket> wws);
         void onAnswer(std::shared_ptr<rtc::WebSocket> wws);
         void onCandidate(std::shared_ptr<rtc::WebSocket> wws);
         bool parseIncomingMessage(char const* data);
-        bool getTypeFromMessage(std::string& out_str);
-        bool getIdFromMessage(std::string& out_str);
-        bool getPeerIdFromMessage(std::string& out_str);
-        bool getDescriptionFromMessage(std::string& out_str);
-        bool getCandidateFromMessage(std::string& out_str);
-        bool getMidFromMessage(std::string& out_str);
-        // std::shared_ptr<rtc::PeerConnection> createPeerConnection(
-        //     const rtc::Configuration& config,
-        //     std::shared_ptr<rtc::WebSocket> wws,
-        //     std::string id);
+        bool getTypeFromMessage(std::string& message);
+        bool getIdFromMessage(std::string& message);
+        bool getPeerIdFromMessage(std::string& message);
+        bool getDescriptionFromMessage(std::string& message);
+        bool getCandidateFromMessage(std::string& message);
+        bool getMidFromMessage(std::string& message);
+        std::shared_ptr<rtc::PeerConnection> createPeerConnection(
+            rtc::Configuration const& config,
+            std::shared_ptr<rtc::WebSocket> const& wws,
+            std::string const& remote_peer_id);
     };
 } // namespace comms_webrtc
 

@@ -6,6 +6,8 @@ using namespace comms_webrtc;
 using namespace std;
 using namespace rtc;
 
+template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
+
 struct comms_webrtc::MessageDecoder
 {
     Json::Value jdata;
@@ -35,17 +37,6 @@ struct comms_webrtc::MessageDecoder
         if (!jdata.isMember("id"))
         {
             LOG_ERROR_S << "Invalid message, it doesn't contain the id field.";
-            LOG_ERROR_S << std::endl;
-            return false;
-        }
-        return true;
-    }
-
-    bool validatePeerId()
-    {
-        if (!jdata.isMember("peer_id"))
-        {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the peer_id field.";
             LOG_ERROR_S << std::endl;
             return false;
         }
@@ -89,8 +80,6 @@ struct comms_webrtc::MessageDecoder
 
     std::string getId() { return jdata["id"].asString(); }
 
-    std::string getPeerId() { return jdata["peer_id"].asString(); }
-
     std::string getDescription() { return jdata["description"].asString(); }
 
     std::string getCandidate() { return jdata["candidate"].asString(); }
@@ -98,22 +87,10 @@ struct comms_webrtc::MessageDecoder
     std::string getMid() { return jdata["mid"].asString(); }
 };
 
-void Task::onOffer(shared_ptr<rtc::WebSocket> wws)
+void Task::onOffer(rtc::Configuration const& config, rtc::shared_ptr<rtc::WebSocket> wws)
 {
-    tmpPc.reset();
-
-    if (!getIdFromMessage(tmpPeerID))
-    {
-        return;
-    }
-
-    std::string peerId;
-    if (!getPeerIdFromMessage(peerId))
-    {
-        return;
-    }
-
-    if (peerId != _local_id.get())
+    std::string remote_peer_id;
+    if (!getIdFromMessage(remote_peer_id))
     {
         return;
     }
@@ -124,48 +101,22 @@ void Task::onOffer(shared_ptr<rtc::WebSocket> wws)
         return;
     }
 
-    // createPeerConnection(wws, tmpPeerID);
+    createPeerConnection(config, wws, remote_peer_id);
 
     try
     {
-        tmpPc->setRemoteDescription(rtc::Description(offer, "offer"));
+        mPeerConnection->setRemoteDescription(rtc::Description(offer, "offer"));
     }
-    catch (const std::logic_error& e)
+    catch (const std::logic_error& error)
     {
-        tmpPc.reset();
-        LOG_ERROR_S << e.what();
+        mPeerConnection.reset();
+        LOG_ERROR_S << error.what();
         LOG_ERROR_S << std::endl;
-        // Json::Value msg;
-        // msg["type"] = "offer";
-        // msg["error"] = e.what();
-        // if (auto ws = wws.lock())
-        // 	ws->send(fast.write(msg));
     }
 }
 
 void Task::onAnswer(shared_ptr<rtc::WebSocket> wws)
 {
-    if (!getIdFromMessage(tmpPeerID))
-    {
-        return;
-    }
-
-    if (tmpPeerID != _peer_id.get())
-    {
-        return;
-    }
-
-    std::string peerId;
-    if (!getPeerIdFromMessage(peerId))
-    {
-        return;
-    }
-
-    if (peerId != _local_id.get())
-    {
-        return;
-    }
-
     std::string answer;
     if (!getDescriptionFromMessage(answer))
     {
@@ -174,55 +125,18 @@ void Task::onAnswer(shared_ptr<rtc::WebSocket> wws)
 
     try
     {
-        tmpPc->setRemoteDescription(rtc::Description(answer, "answer"));
+        mPeerConnection->setRemoteDescription(rtc::Description(answer, "answer"));
     }
-    catch (const std::logic_error& e)
+    catch (const std::logic_error& error)
     {
-        tmpPc.reset();
-        LOG_ERROR_S << e.what();
+        mPeerConnection.reset();
+        LOG_ERROR_S << error.what();
         LOG_ERROR_S << std::endl;
-        // Json::Value msg;
-        // msg["type"] = "answer";
-        // msg["error"] = e.what();
-        // if (auto ws = wws.lock())
-        // 	ws->send(fast.write(msg));
     }
 }
 
 void Task::onCandidate(shared_ptr<rtc::WebSocket> wws)
 {
-    if (!tmpPc)
-    {
-        // Json::Value msg;
-        // msg["type"] = "candidate";
-        // msg["error"] = "must send offer before candidates";
-        // if (auto ws = wws.lock())
-        // 	ws->send(fast.write(msg));
-        return;
-    }
-
-    std::string id;
-    if (!getIdFromMessage(id))
-    {
-        return;
-    }
-
-    if (id != tmpPeerID)
-    {
-        return;
-    }
-
-    std::string peerId;
-    if (!getPeerIdFromMessage(peerId))
-    {
-        return;
-    }
-
-    if (peerId != _local_id.get())
-    {
-        return;
-    }
-
     std::string candidate;
     if (!getCandidateFromMessage(candidate))
     {
@@ -237,156 +151,158 @@ void Task::onCandidate(shared_ptr<rtc::WebSocket> wws)
 
     try
     {
-        tmpPc->addRemoteCandidate(rtc::Candidate(candidate, mid));
+        mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate, mid));
     }
-    catch (const std::logic_error& e)
+    catch (const std::logic_error& error)
     {
-        LOG_ERROR_S << e.what();
+        mPeerConnection.reset();
+        LOG_ERROR_S << error.what();
         LOG_ERROR_S << std::endl;
-        // Json::Value msg;
-        // msg["type"] = "candidate";
-        // msg["error"] = e.what();
-        // if (auto ws = wws.lock())
-        // 	ws->send(fast.write(msg));
     }
 }
 
 bool Task::parseIncomingMessage(char const* data)
 {
-    std::string errs;
-    if (!decoder->parseJSONMessage(data, errs))
+    std::string error;
+    if (!decoder->parseJSONMessage(data, error))
     {
-        LOG_ERROR_S << "Failed parsing the message, got error: " << errs << std::endl;
+        LOG_ERROR_S << "Failed parsing the message, got error: " << error << std::endl;
         return false;
     }
     return true;
 }
 
-bool Task::getTypeFromMessage(std::string& out_str)
+bool Task::getTypeFromMessage(std::string& message)
 {
     if (!decoder->validateType())
     {
         return false;
     }
-    out_str = decoder->getType();
+    message = decoder->getType();
     return true;
 }
 
-bool Task::getIdFromMessage(std::string& out_str)
+bool Task::getIdFromMessage(std::string& message)
 {
     if (!decoder->validateId())
     {
         return false;
     }
-    out_str = decoder->getId();
+    message = decoder->getId();
     return true;
 }
 
-bool Task::getPeerIdFromMessage(std::string& out_str)
-{
-    if (!decoder->validatePeerId())
-    {
-        return false;
-    }
-    out_str = decoder->getPeerId();
-    return true;
-}
-
-bool Task::getDescriptionFromMessage(std::string& out_str)
+bool Task::getDescriptionFromMessage(std::string& message)
 {
     if (!decoder->validateDescription())
     {
         return false;
     }
-    out_str = decoder->getDescription();
+    message = decoder->getDescription();
     return true;
 }
 
-bool Task::getCandidateFromMessage(std::string& out_str)
+bool Task::getCandidateFromMessage(std::string& message)
 {
     if (!decoder->validateCandidate())
     {
         return false;
     }
-    out_str = decoder->getCandidate();
+    message = decoder->getCandidate();
     return true;
 }
 
-bool Task::getMidFromMessage(std::string& out_str)
+bool Task::getMidFromMessage(std::string& message)
 {
     if (!decoder->validateMid())
     {
         return false;
     }
-    out_str = decoder->getMid();
+    message = decoder->getMid();
     return true;
 }
 
-// // Create and setup a PeerConnection
-// shared_ptr<rtc::PeerConnection> Task::createPeerConnection(const rtc::Configuration
-// &config,
-//                                                      shared_ptr<rtc::WebSocket> wws,
-//                                                      std::string id) {
-// 	auto pc = std::make_shared<rtc::PeerConnection>(config);
+// Create and setup a PeerConnection
+shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
+    rtc::Configuration const& config,
+    shared_ptr<rtc::WebSocket> const& wws,
+    string const& remote_peer_id)
+{
+    auto peer_connection = std::make_shared<rtc::PeerConnection>(config);
 
-// 	pc->onStateChange(
-// 	    [](rtc::PeerConnection::State state) { std::cout << "State: " << state <<
-// std::endl; });
+    peer_connection->onStateChange([](rtc::PeerConnection::State state)
+                                   { LOG_INFO_S << "State: " << state << std::endl; });
 
-// 	pc->onGatheringStateChange([](rtc::PeerConnection::GatheringState state) {
-// 		std::cout << "Gathering State: " << state << std::endl;
-// 	});
+    peer_connection->onGatheringStateChange(
+        [](rtc::PeerConnection::GatheringState state)
+        { LOG_INFO_S << "Gathering State: " << state << std::endl; });
 
-// 	pc->onLocalDescription([wws, id](rtc::Description description) {
-// 		json message = {{"id", id},
-// 		                {"type", description.typeString()},
-// 		                {"description", std::string(description)}};
+    peer_connection->onLocalDescription(
+        [wws, remote_peer_id](rtc::Description description)
+        {
+            Json::Value message;
+            Json::FastWriter fast;
+            message["id"] = remote_peer_id;
+            message["type"] = description.typeString();
+            message["description"] = std::string(description);
 
-// 		if (auto ws = wws.lock())
-// 			ws->send(message.dump());
-// 	});
+            if (auto ws = make_weak_ptr(wws).lock())
+                ws->send(fast.write(message));
+        });
 
-// 	pc->onLocalCandidate([wws, id](rtc::Candidate candidate) {
-// 		json message = {{"id", id},
-// 		                {"type", "candidate"},
-// 		                {"candidate", std::string(candidate)},
-// 		                {"mid", candidate.mid()}};
+    peer_connection->onLocalCandidate(
+        [wws, remote_peer_id](rtc::Candidate candidate)
+        {
+            Json::Value message;
+            Json::FastWriter fast;
+            message["id"] = remote_peer_id;
+            message["type"] = "candidate";
+            message["candidate"] = std::string(candidate);
+            message["mid"] = candidate.mid();
 
-// 		if (auto ws = wws.lock())
-// 			ws->send(message.dump());
-// 	});
+            if (auto ws = make_weak_ptr(wws).lock())
+                ws->send(fast.write(message));
+        });
 
-// 	pc->onDataChannel([id](shared_ptr<rtc::DataChannel> dc) {
-// 		std::cout << "DataChannel from " << id << " received with label \"" << dc->label() <<
-// "\""
-// 		          << std::endl;
+    string local_id = _local_peer_id.get();
+    unordered_map<std::string, std::shared_ptr<rtc::DataChannel>> data_channel_map =
+        mDataChannelMap;
+    peer_connection->onDataChannel(
+        [local_id, remote_peer_id, &data_channel_map](
+            shared_ptr<rtc::DataChannel> data_channel)
+        {
+            LOG_INFO_S << "DataChannel from " << remote_peer_id
+                       << " received with label \"" << data_channel->label() << "\""
+                       << std::endl;
 
-// 		dc->onOpen([wdc = make_weak_ptr(dc)]() {
-// 			if (auto dc = wdc.lock())
-// 				dc->send("Hello from " + localId);
-// 		});
+            data_channel->onOpen(
+                [local_id, wdc = make_weak_ptr(data_channel)]()
+                {
+                    if (auto data_channel = wdc.lock())
+                        data_channel->send("Hello from " + local_id);
+                });
 
-// 		dc->onClosed([id]() { std::cout << "DataChannel from " << id << " closed" <<
-// std::endl; });
+            data_channel->onMessage(
+                [remote_peer_id](auto data)
+                {
+                    // data holds either std::string or rtc::binary
+                    if (std::holds_alternative<std::string>(data))
+                        LOG_INFO_S << "Message from " << remote_peer_id
+                                   << " received: " << std::get<std::string>(data)
+                                   << std::endl;
+                    else
+                        LOG_INFO_S
+                            << "Binary message from " << remote_peer_id
+                            << " received, size=" << std::get<rtc::binary>(data).size()
+                            << std::endl;
+                });
 
-// 		dc->onMessage([id](auto data) {
-// 			// data holds either std::string or rtc::binary
-// 			if (std::holds_alternative<std::string>(data))
-// 				std::cout << "Message from " << id << " received: " <<
-// std::get<std::string>(data)
-// 				          << std::endl;
-// 			else
-// 				std::cout << "Binary message from " << id
-// 				          << " received, size=" << std::get<rtc::binary>(data).size() <<
-// std::endl;
-// 		});
+            data_channel_map.emplace(remote_peer_id, data_channel);
+        });
 
-// 		dataChannelMap.emplace(id, dc);
-// 	});
-
-// 	peerConnectionMap.emplace(id, pc);
-// 	return pc;
-// };
+    mPeerConnectionMap.emplace(remote_peer_id, peer_connection);
+    return peer_connection;
+};
 
 Task::Task(std::string const& name) : TaskBase(name) {}
 
@@ -404,55 +320,50 @@ bool Task::configureHook()
     rtc::Configuration config;
     config.iceServers.emplace_back(_ice_server.get());
 
-    m_ws = std::make_shared<rtc::WebSocket>();
+    mWs = std::make_shared<rtc::WebSocket>();
     std::promise<void> wsPromise;
     auto wsFuture = wsPromise.get_future();
 
-    m_ws->onOpen(
+    mWs->onOpen(
         [&wsPromise]()
         {
             LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
             wsPromise.set_value();
         });
 
-    // m_ws->onMessage([&](variant<binary, string> data) {
-    // 	if (!holds_alternative<string>(data))
-    // 		return;
+    mWs->onMessage(
+        [&](variant<binary, string> data)
+        {
+            if (!holds_alternative<string>(data))
+                return;
 
-    //     if (!this->parseIncomingMessage(get<std::string>(data).c_str())) {
-    //         return;
-    //     }
+            if (!parseIncomingMessage(get<std::string>(data).c_str()))
+            {
+                return;
+            }
 
-    //     std::string type;
-    //     if (!this->getTypeFromMessage(type)) {
-    //         return;
-    //     }
+            std::string type;
+            if (!getTypeFromMessage(type))
+            {
+                return;
+            }
 
-    //     if (type == "offer")
-    //     {
-    //         onOffer(m_ws);
-    //     }
-    //     else if (type == "answer")
-    //     {
-    //         onAnswer(m_ws);
-    //     }
-    //     else if (type == "candidate")
-    //     {
-    //         onCandidate(m_ws);
-    //     }
+            if (type == "offer")
+            {
+                onOffer(config, mWs);
+            }
+            else if (type == "answer")
+            {
+                onAnswer(mWs);
+            }
+            else if (type == "candidate")
+            {
+                onCandidate(mWs);
+            }
+        });
 
-    // });
-
-    string wsPrefix = "";
-    if (_websocket_server.get().substr(0, 5).compare("ws://") != 0)
-    {
-        wsPrefix = "ws://";
-    }
-    const string url = wsPrefix + _websocket_server.get() + ":" +
-                       to_string(_websocket_port.get()) + "/" + _local_id.get();
-
-    m_ws->open(url);
-
+    const string url = _websocket_server_name.get() + "/user=" + _local_peer_id.get();
+    mWs->open(url);
     wsFuture.get();
 
     return true;
@@ -466,4 +377,10 @@ bool Task::startHook()
 void Task::updateHook() { TaskBase::updateHook(); }
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook() { TaskBase::stopHook(); }
-void Task::cleanupHook() { TaskBase::cleanupHook(); }
+void Task::cleanupHook()
+{
+    mDataChannelMap.clear();
+    mPeerConnectionMap.clear();
+
+    TaskBase::cleanupHook();
+}

@@ -13,10 +13,10 @@ task_context "Task" do
     needs_configuration
 
     property "ice_server", "std/string"
-    property "local_id", "std/string"
-    property "dc_label", "std/string"
-    property "websocket_server", "std/string"
-    property "websocket_port", "uint16_t", 58_000
+    property "local_peer_id", "std/string"
+    property "remote_peer_id", "std/string"
+    property "data_channel_label", "std/string"
+    property "websocket_server_name", "std/string"
 
     input_port "data_in", "iodrivers_base/RawPacket"
     output_port "data_out", "iodrivers_base/RawPacket"
