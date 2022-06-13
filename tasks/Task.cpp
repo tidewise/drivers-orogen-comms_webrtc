@@ -363,7 +363,8 @@ bool Task::configureHook()
             }
         });
 
-    const string url = _websocket_server_name.get() + "/user=" + _local_peer_id.get();
+    // wss://signalserverhost?user=yourname
+    const string url = _websocket_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
     wsFuture.get();
 
