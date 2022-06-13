@@ -87,7 +87,7 @@ struct comms_webrtc::MessageDecoder
     std::string getMid() { return jdata["mid"].asString(); }
 };
 
-void Task::onOffer(rtc::Configuration const& config, rtc::shared_ptr<rtc::WebSocket> wws)
+void Task::onOffer(rtc::Configuration const& config, rtc::shared_ptr<rtc::WebSocket> wws, string local_peer_id)
 {
     std::string remote_peer_id;
     if (!getIdFromMessage(remote_peer_id))
@@ -101,7 +101,7 @@ void Task::onOffer(rtc::Configuration const& config, rtc::shared_ptr<rtc::WebSoc
         return;
     }
 
-    createPeerConnection(config, wws, remote_peer_id);
+    createPeerConnection(config, wws, local_peer_id, remote_peer_id);
 
     try
     {
@@ -226,6 +226,7 @@ bool Task::getMidFromMessage(std::string& message)
 shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
     rtc::Configuration const& config,
     shared_ptr<rtc::WebSocket> const& wws,
+    string const& local_peer_id,
     string const& remote_peer_id)
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(config);
@@ -264,11 +265,10 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                 ws->send(fast.write(message));
         });
 
-    string local_id = _local_peer_id.get();
     unordered_map<std::string, std::shared_ptr<rtc::DataChannel>> data_channel_map =
         mDataChannelMap;
     peer_connection->onDataChannel(
-        [local_id, remote_peer_id, &data_channel_map](
+        [local_peer_id, remote_peer_id, &data_channel_map](
             shared_ptr<rtc::DataChannel> data_channel)
         {
             LOG_INFO_S << "DataChannel from " << remote_peer_id
@@ -276,10 +276,10 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                        << std::endl;
 
             data_channel->onOpen(
-                [local_id, wdc = make_weak_ptr(data_channel)]()
+                [local_peer_id, wdc = make_weak_ptr(data_channel)]()
                 {
                     if (auto data_channel = wdc.lock())
-                        data_channel->send("Hello from " + local_id);
+                        data_channel->send("Hello from " + local_peer_id);
                 });
 
             data_channel->onMessage(
@@ -321,6 +321,7 @@ bool Task::configureHook()
     config.iceServers.emplace_back(_ice_server.get());
 
     mWs = std::make_shared<rtc::WebSocket>();
+    mLocalPeerId = _local_peer_id.get();
     std::promise<void> wsPromise;
     auto wsFuture = wsPromise.get_future();
 
@@ -350,7 +351,7 @@ bool Task::configureHook()
 
             if (type == "offer")
             {
-                onOffer(config, mWs);
+                onOffer(config, mWs, mLocalPeerId);
             }
             else if (type == "answer")
             {
