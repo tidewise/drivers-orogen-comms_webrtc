@@ -106,6 +106,7 @@ namespace comms_webrtc
         void cleanupHook();
 
       private:
+        rtc::Configuration mConfig;
         std::shared_ptr<rtc::WebSocket> mWs;
         std::string mLocalPeerId;
         MessageDecoder* decoder = nullptr;

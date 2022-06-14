@@ -88,7 +88,10 @@ struct comms_webrtc::MessageDecoder
     std::string getMid() { return jdata["mid"].asString(); }
 };
 
-void Task::onOffer(rtc::Configuration const& config, rtc::shared_ptr<rtc::WebSocket> wws, string local_peer_id)
+void Task::onOffer(
+    rtc::Configuration const& config,
+    rtc::shared_ptr<rtc::WebSocket> wws,
+    string local_peer_id)
 {
     std::string remote_peer_id;
     if (!getIdFromMessage(remote_peer_id))
@@ -284,18 +287,24 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                 });
 
             data_channel->onMessage(
-                [remote_peer_id](auto data)
+                [&this](variant<binary, string> data)
                 {
-                    // data holds either std::string or rtc::binary
-                    if (std::holds_alternative<std::string>(data))
-                        LOG_INFO_S << "Message from " << remote_peer_id
-                                   << " received: " << std::get<std::string>(data)
-                                   << std::endl;
+                    RawPacket dataPacket;
+                    dataPacket.time = base::Time::now();
+
+                    if (holds_alternative<string>(data))
+                    {
+                        // TODO
+                    }
                     else
-                        LOG_INFO_S
-                            << "Binary message from " << remote_peer_id
-                            << " received, size=" << std::get<rtc::binary>(data).size()
-                            << std::endl;
+                    {
+                        std::vector<uint8_t> new_data(
+                            get<binary>(data).begin(),
+                            get<binary>(data).end());
+                        dataPacket.data = new_data;
+                    }
+
+                    _data_out.write(dataPacket);
                 });
 
             data_channel_map.emplace(remote_peer_id, data_channel);
@@ -318,8 +327,7 @@ bool Task::configureHook()
     if (!TaskBase::configureHook())
         return false;
 
-    rtc::Configuration config;
-    config.iceServers.emplace_back(_ice_server.get());
+    mConfig.iceServers.emplace_back(_ice_server.get());
 
     mWs = std::make_shared<rtc::WebSocket>();
     mLocalPeerId = _local_peer_id.get();
@@ -333,10 +341,12 @@ bool Task::configureHook()
             ws_promise.set_value();
         });
 
-    mWs->onError([&ws_promise](std::string s) {
-		LOG_INFO_S << "WebSocket error" << std::endl;
-		ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(s)));
-	});
+    mWs->onError(
+        [&ws_promise](std::string s)
+        {
+            LOG_INFO_S << "WebSocket error" << std::endl;
+            ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(s)));
+        });
 
     mWs->onClosed([]() { LOG_INFO_S << "WebSocket closed" << std::endl; });
 
@@ -359,7 +369,7 @@ bool Task::configureHook()
 
             if (type == "offer")
             {
-                onOffer(config, mWs, mLocalPeerId);
+                onOffer(mConfig, mWs, mLocalPeerId);
             }
             else if (type == "answer")
             {
@@ -384,7 +394,36 @@ bool Task::startHook()
         return false;
     return true;
 }
-void Task::updateHook() { TaskBase::updateHook(); }
+void Task::updateHook()
+{
+    RawPacket raw_packet;
+    if (_data_in.read(raw_packet) == RTT::NewData && !_remote_peer_id.get().empty())
+    {
+        string remote_id = _remote_peer_id.get();
+        string local_id = mLocalPeerId;
+
+        shared_ptr<rtc::PeerConnection> peer_connection =
+            createPeerConnection(mConfig, mWs, local_id, remote_id);
+
+        // We are the offerer, so create a data channel to initiate the process
+        const std::string label = _data_channel_label.get();
+        LOG_INFO_S << "Creating DataChannel with label \"" << label << "\"" << std::endl;
+        shared_ptr<rtc::DataChannel> data_channel =
+            peer_connection->createDataChannel(label);
+
+        peer_connection->onDataChannel([&data_channel, raw_packet](std::shared_ptr<rtc::DataChannel> incoming) {
+            data_channel = incoming;
+            // vector<byte> bytes;
+            // for (auto const& x : raw_packet.data)
+            //     bytes.insert(bytes.end(), x.first, x.first+x.second);
+            
+            // TODO
+            // data_channel->send(raw_packet.data, raw_packet.data.size());
+        });
+    }
+
+    TaskBase::updateHook();
+}
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook() { TaskBase::stopHook(); }
 void Task::cleanupHook()
