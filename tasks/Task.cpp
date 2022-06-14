@@ -3,6 +3,7 @@
 #include "Task.hpp"
 
 using namespace comms_webrtc;
+using namespace iodrivers_base;
 using namespace std;
 using namespace rtc;
 
@@ -322,15 +323,22 @@ bool Task::configureHook()
 
     mWs = std::make_shared<rtc::WebSocket>();
     mLocalPeerId = _local_peer_id.get();
-    std::promise<void> wsPromise;
-    auto wsFuture = wsPromise.get_future();
+    std::promise<void> ws_promise;
+    auto ws_future = ws_promise.get_future();
 
     mWs->onOpen(
-        [&wsPromise]()
+        [&ws_promise]()
         {
             LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
-            wsPromise.set_value();
+            ws_promise.set_value();
         });
+
+    mWs->onError([&ws_promise](std::string s) {
+		LOG_INFO_S << "WebSocket error" << std::endl;
+		ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(s)));
+	});
+
+    mWs->onClosed([]() { LOG_INFO_S << "WebSocket closed" << std::endl; });
 
     mWs->onMessage(
         [&](variant<binary, string> data)
@@ -366,7 +374,7 @@ bool Task::configureHook()
     // wss://signalserverhost?user=yourname
     const string url = _websocket_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
-    wsFuture.get();
+    ws_future.get();
 
     return true;
 }
