@@ -226,7 +226,20 @@ bool Task::getMidFromMessage(std::string& message)
 // Create and setup a PeerConnection
 shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
     shared_ptr<rtc::WebSocket> const& wws,
-    std::string const& remote_peer_id)
+    string const& remote_peer_id)
+{
+    shared_ptr<rtc::PeerConnection> peer_connection =
+        configurePeerConnection(wws, remote_peer_id);
+
+    configureDataChannel(peer_connection, remote_peer_id);
+
+    mPeerConnectionMap.emplace(remote_peer_id, peer_connection);
+    return peer_connection;
+};
+
+shared_ptr<rtc::PeerConnection> Task::configurePeerConnection(
+    shared_ptr<rtc::WebSocket> const& wws,
+    string const& remote_peer_id)
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
 
@@ -264,6 +277,13 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                 ws->send(fast.write(message));
         });
 
+    return peer_connection;
+}
+
+void Task::configureDataChannel(
+    shared_ptr<rtc::PeerConnection> const& peer_connection,
+    string const& remote_peer_id)
+{
     peer_connection->onDataChannel(
         [&](shared_ptr<rtc::DataChannel> data_channel)
         {
@@ -298,10 +318,7 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
 
             mDataChannelMap.emplace(remote_peer_id, data_channel);
         });
-
-    mPeerConnectionMap.emplace(remote_peer_id, peer_connection);
-    return peer_connection;
-};
+}
 
 Task::Task(std::string const& name) : TaskBase(name) {}
 
@@ -411,6 +428,7 @@ void Task::updateHook()
             [&data_channel, raw_packet](std::shared_ptr<rtc::DataChannel> incoming)
             {
                 data_channel = incoming;
+
                 // TODO
                 // data_channel->send();
             });
