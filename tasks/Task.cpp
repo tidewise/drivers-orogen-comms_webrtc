@@ -320,32 +320,17 @@ void Task::configureDataChannel(
         });
 }
 
-Task::Task(std::string const& name) : TaskBase(name) {}
-
-Task::~Task() {}
-
-/// The following lines are template definitions for the various state machine
-// hooks defined by Orocos::RTT. See Task.hpp for more detailed
-// documentation about them.
-
-bool Task::configureHook()
+void Task::configureWebSocket()
 {
-    if (!TaskBase::configureHook())
-        return false;
-
-    mConfig.iceServers.emplace_back(_ice_server.get());
-
-    mWs = std::make_shared<rtc::WebSocket>();
-    mLocalPeerId = _local_peer_id.get();
-    std::promise<void> ws_promise;
+    promise<void> ws_promise;
     auto ws_future = ws_promise.get_future();
 
     mWs->onOpen(
-        [&ws_promise]()
-        {
-            LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
-            ws_promise.set_value();
-        });
+    [&ws_promise]()
+    {
+        LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
+        ws_promise.set_value();
+    });
 
     mWs->onError(
         [&ws_promise](std::string s)
@@ -401,6 +386,25 @@ bool Task::configureHook()
     const string url = _websocket_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
     ws_future.get();
+}
+
+Task::Task(std::string const& name) : TaskBase(name) {}
+
+Task::~Task() {}
+
+/// The following lines are template definitions for the various state machine
+// hooks defined by Orocos::RTT. See Task.hpp for more detailed
+// documentation about them.
+
+bool Task::configureHook()
+{
+    if (!TaskBase::configureHook())
+        return false;
+
+    mConfig.iceServers.emplace_back(_ice_server.get());
+    mLocalPeerId = _local_peer_id.get();
+
+    configureWebSocket();
 
     return true;
 }

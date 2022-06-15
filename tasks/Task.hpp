@@ -133,6 +133,7 @@ namespace comms_webrtc
         void configureDataChannel(
             std::shared_ptr<rtc::PeerConnection> const& peer_connection,
             std::string const& remote_peer_id);
+        void configureWebSocket();
         std::shared_ptr<rtc::PeerConnection> configurePeerConnection(
             std::shared_ptr<rtc::WebSocket> const& wws,
             std::string const& remote_peer_id);
