@@ -88,10 +88,7 @@ struct comms_webrtc::MessageDecoder
     std::string getMid() { return jdata["mid"].asString(); }
 };
 
-void Task::onOffer(
-    rtc::Configuration const& config,
-    rtc::shared_ptr<rtc::WebSocket> wws,
-    string local_peer_id)
+void Task::onOffer(rtc::shared_ptr<rtc::WebSocket> wws)
 {
     std::string remote_peer_id;
     if (!getIdFromMessage(remote_peer_id))
@@ -105,7 +102,7 @@ void Task::onOffer(
         return;
     }
 
-    createPeerConnection(config, wws, local_peer_id, remote_peer_id);
+    mPeerConnection = createPeerConnection(wws, remote_peer_id);
 
     try
     {
@@ -228,12 +225,10 @@ bool Task::getMidFromMessage(std::string& message)
 
 // Create and setup a PeerConnection
 shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
-    rtc::Configuration const& config,
     shared_ptr<rtc::WebSocket> const& wws,
-    string const& local_peer_id,
-    string const& remote_peer_id)
+    std::string const& remote_peer_id)
 {
-    auto peer_connection = std::make_shared<rtc::PeerConnection>(config);
+    auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
 
     peer_connection->onStateChange([](rtc::PeerConnection::State state)
                                    { LOG_INFO_S << "State: " << state << std::endl; });
@@ -243,7 +238,7 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
         { LOG_INFO_S << "Gathering State: " << state << std::endl; });
 
     peer_connection->onLocalDescription(
-        [wws, remote_peer_id](rtc::Description description)
+        [&, wws](rtc::Description description)
         {
             Json::Value message;
             Json::FastWriter fast;
@@ -256,7 +251,7 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
         });
 
     peer_connection->onLocalCandidate(
-        [wws, remote_peer_id](rtc::Candidate candidate)
+        [&, wws](rtc::Candidate candidate)
         {
             Json::Value message;
             Json::FastWriter fast;
@@ -269,25 +264,22 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                 ws->send(fast.write(message));
         });
 
-    unordered_map<std::string, std::shared_ptr<rtc::DataChannel>> data_channel_map =
-        mDataChannelMap;
     peer_connection->onDataChannel(
-        [local_peer_id, remote_peer_id, &data_channel_map](
-            shared_ptr<rtc::DataChannel> data_channel)
+        [&](shared_ptr<rtc::DataChannel> data_channel)
         {
             LOG_INFO_S << "DataChannel from " << remote_peer_id
                        << " received with label \"" << data_channel->label() << "\""
                        << std::endl;
 
             data_channel->onOpen(
-                [local_peer_id, wdc = make_weak_ptr(data_channel)]()
+                [&, wdc = make_weak_ptr(data_channel)]()
                 {
                     if (auto data_channel = wdc.lock())
-                        data_channel->send("Hello from " + local_peer_id);
+                        data_channel->send("Hello from " + mLocalPeerId);
                 });
 
             data_channel->onMessage(
-                [&this](variant<binary, string> data)
+                [&](variant<binary, string> data)
                 {
                     RawPacket dataPacket;
                     dataPacket.time = base::Time::now();
@@ -298,16 +290,13 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
                     }
                     else
                     {
-                        std::vector<uint8_t> new_data(
-                            get<binary>(data).begin(),
-                            get<binary>(data).end());
-                        dataPacket.data = new_data;
+                        // TODO
                     }
 
                     _data_out.write(dataPacket);
                 });
 
-            data_channel_map.emplace(remote_peer_id, data_channel);
+            mDataChannelMap.emplace(remote_peer_id, data_channel);
         });
 
     mPeerConnectionMap.emplace(remote_peer_id, peer_connection);
@@ -367,11 +356,21 @@ bool Task::configureHook()
                 return;
             }
 
-            if (type == "offer")
+            // Or the peerconnection is already created or we give a offer, creating one.
+            if (auto jt = mPeerConnectionMap.find("id"); jt != mPeerConnectionMap.end())
             {
-                onOffer(mConfig, mWs, mLocalPeerId);
+                mPeerConnection = jt->second;
             }
-            else if (type == "answer")
+            else if (type == "offer")
+            {
+                onOffer(mWs);
+            }
+            else
+            {
+                return;
+            }
+
+            if (type == "answer")
             {
                 onAnswer(mWs);
             }
@@ -399,11 +398,8 @@ void Task::updateHook()
     RawPacket raw_packet;
     if (_data_in.read(raw_packet) == RTT::NewData && !_remote_peer_id.get().empty())
     {
-        string remote_id = _remote_peer_id.get();
-        string local_id = mLocalPeerId;
-
         shared_ptr<rtc::PeerConnection> peer_connection =
-            createPeerConnection(mConfig, mWs, local_id, remote_id);
+            createPeerConnection(mWs, _remote_peer_id.get());
 
         // We are the offerer, so create a data channel to initiate the process
         const std::string label = _data_channel_label.get();
@@ -411,15 +407,13 @@ void Task::updateHook()
         shared_ptr<rtc::DataChannel> data_channel =
             peer_connection->createDataChannel(label);
 
-        peer_connection->onDataChannel([&data_channel, raw_packet](std::shared_ptr<rtc::DataChannel> incoming) {
-            data_channel = incoming;
-            // vector<byte> bytes;
-            // for (auto const& x : raw_packet.data)
-            //     bytes.insert(bytes.end(), x.first, x.first+x.second);
-            
-            // TODO
-            // data_channel->send(raw_packet.data, raw_packet.data.size());
-        });
+        peer_connection->onDataChannel(
+            [&data_channel, raw_packet](std::shared_ptr<rtc::DataChannel> incoming)
+            {
+                data_channel = incoming;
+                // TODO
+                // data_channel->send();
+            });
     }
 
     TaskBase::updateHook();

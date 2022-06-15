@@ -118,9 +118,7 @@ namespace comms_webrtc
             mDataChannelMap;
 
         void onOffer(
-            rtc::Configuration const& config,
-            std::shared_ptr<rtc::WebSocket> wws,
-            std::string local_peer_id);
+            std::shared_ptr<rtc::WebSocket> wws);
         void onAnswer(std::shared_ptr<rtc::WebSocket> wws);
         void onCandidate(std::shared_ptr<rtc::WebSocket> wws);
         bool parseIncomingMessage(char const* data);
@@ -131,9 +129,7 @@ namespace comms_webrtc
         bool getCandidateFromMessage(std::string& message);
         bool getMidFromMessage(std::string& message);
         std::shared_ptr<rtc::PeerConnection> createPeerConnection(
-            rtc::Configuration const& config,
             std::shared_ptr<rtc::WebSocket> const& wws,
-            std::string const& local_peer_id,
             std::string const& remote_peer_id);
     };
 } // namespace comms_webrtc
