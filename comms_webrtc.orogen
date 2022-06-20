@@ -12,13 +12,28 @@ using_library "jsoncpp", typekit: false
 task_context "Task" do
     needs_configuration
 
-    property "ice_server", "std/string"
+    # Stun server (if No STUN server is configured,
+    # only local hosts and public IP addresses are supported)
+    property "stun_server", "std/string"
+
+    # Local peer id
     property "local_peer_id", "std/string"
+
+    # Remote peer id (if it is not given by default, the component
+    # will be able to just answer first, then get the remote ip from
+    # the riquired peer connection)
     property "remote_peer_id", "std/string"
+
+    # Data channel label
     property "data_channel_label", "std/string"
+
+    # Websocket server name (e.g. wss://signalserverhost)
     property "websocket_server_name", "std/string"
 
+    # Rawdata in
     input_port "data_in", "iodrivers_base/RawPacket"
+
+    # Rawdata out
     output_port "data_out", "iodrivers_base/RawPacket"
 
     port_driven

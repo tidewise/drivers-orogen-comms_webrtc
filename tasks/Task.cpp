@@ -196,7 +196,7 @@ void Task::configureDataChannel(
                 [&, wdc = make_weak_ptr(data_channel)]()
                 {
                     if (auto data_channel = wdc.lock())
-                        data_channel->send("Hello from " + mLocalPeerId);
+                        data_channel->send("DataChannel open");
                 });
 
             data_channel->onMessage(
@@ -303,7 +303,7 @@ bool Task::configureHook()
     if (!TaskBase::configureHook())
         return false;
 
-    mConfig.iceServers.emplace_back(_ice_server.get());
+    mConfig.iceServers.emplace_back(_stun_server.get());
     mLocalPeerId = _local_peer_id.get();
 
     configureWebSocket();
@@ -343,6 +343,7 @@ void Task::updateHook()
                 data_channel->send(&data.front(), data.size());
             });
     }
+    // TODO - If we have data_in, but we don't have remote peer id.
 
     TaskBase::updateHook();
 }
