@@ -13,100 +13,64 @@ struct comms_webrtc::MessageDecoder
 {
     Json::Value jdata;
     Json::CharReaderBuilder rbuilder;
-    std::unique_ptr<Json::CharReader> const reader;
+    unique_ptr<Json::CharReader> const reader;
 
     MessageDecoder() : reader(rbuilder.newCharReader()) {}
 
-    bool parseJSONMessage(char const* data, std::string& errors)
+    bool parseJSONMessage(char const* data, string& errors)
     {
-        return reader->parse(data, data + std::strlen(data), &jdata, &errors);
+        return reader->parse(data, data + strlen(data), &jdata, &errors);
     }
 
-    bool validateType()
+    void validateFieldPresent(string fieldName)
     {
-        if (!jdata.isMember("type"))
+        if (!jdata.isMember(fieldName))
         {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the type field.";
-            LOG_ERROR_S << std::endl;
-            return false;
+            throw invalid_argument("message does not contain the " + fieldName + " field");
         }
-        return true;
     }
 
-    bool validateId()
+    string getType()
     {
-        if (!jdata.isMember("id"))
-        {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the id field.";
-            LOG_ERROR_S << std::endl;
-            return false;
-        }
-        return true;
+        validateFieldPresent("type");
+        return jdata["type"].asString();
     }
 
-    bool validateDescription()
+    string getId()
     {
-        if (!jdata.isMember("description"))
-        {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the description field.";
-            LOG_ERROR_S << std::endl;
-            return false;
-        }
-        return true;
+        validateFieldPresent("id");
+        return jdata["id"].asString();
     }
 
-    bool validateCandidate()
+    string getDescription()
     {
-        if (!jdata.isMember("candidate"))
-        {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the candidate field.";
-            LOG_ERROR_S << std::endl;
-            return false;
-        }
-        return true;
+        validateFieldPresent("description");
+        return jdata["description"].asString();
     }
 
-    bool validateMid()
+    string getCandidate()
     {
-        if (!jdata.isMember("mid"))
-        {
-            LOG_ERROR_S << "Invalid message, it doesn't contain the mid field.";
-            LOG_ERROR_S << std::endl;
-            return false;
-        }
-        return true;
+        validateFieldPresent("candidate");
+        return jdata["candidate"].asString();
     }
 
-    std::string getType() { return jdata["type"].asString(); }
-
-    std::string getId() { return jdata["id"].asString(); }
-
-    std::string getDescription() { return jdata["description"].asString(); }
-
-    std::string getCandidate() { return jdata["candidate"].asString(); }
-
-    std::string getMid() { return jdata["mid"].asString(); }
+    string getMid()
+    {
+        validateFieldPresent("mid");
+        return jdata["mid"].asString();
+    }
 };
 
 void Task::onOffer(rtc::shared_ptr<rtc::WebSocket> wws)
 {
-    std::string remote_peer_id;
-    if (!getIdFromMessage(remote_peer_id))
-    {
-        return;
-    }
-
-    std::string offer;
-    if (!getDescriptionFromMessage(offer))
-    {
-        return;
-    }
-
+    string remote_peer_id = decoder->getId();
+    string description = decoder->getDescription();
+    
     mPeerConnection = createPeerConnection(wws, remote_peer_id);
 
     try
     {
-        mPeerConnection->setRemoteDescription(rtc::Description(offer, "offer"));
+        mPeerConnection->setRemoteDescription(rtc::Description(description, "offer"));
     }
     catch (const std::logic_error& error)
     {
@@ -116,17 +80,13 @@ void Task::onOffer(rtc::shared_ptr<rtc::WebSocket> wws)
     }
 }
 
-void Task::onAnswer(shared_ptr<rtc::WebSocket> wws)
+void Task::onAnswer()
 {
-    std::string answer;
-    if (!getDescriptionFromMessage(answer))
-    {
-        return;
-    }
+    string description = decoder->getDescription();
 
     try
     {
-        mPeerConnection->setRemoteDescription(rtc::Description(answer, "answer"));
+        mPeerConnection->setRemoteDescription(rtc::Description(description, "answer"));
     }
     catch (const std::logic_error& error)
     {
@@ -136,25 +96,16 @@ void Task::onAnswer(shared_ptr<rtc::WebSocket> wws)
     }
 }
 
-void Task::onCandidate(shared_ptr<rtc::WebSocket> wws)
+void Task::onCandidate()
 {
-    std::string candidate;
-    if (!getCandidateFromMessage(candidate))
-    {
-        return;
-    }
-
-    std::string mid;
-    if (!getMidFromMessage(mid))
-    {
-        return;
-    }
+    string candidate = decoder->getCandidate();
+    string mid = decoder->getMid();
 
     try
     {
         mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate, mid));
     }
-    catch (const std::logic_error& error)
+    catch (const logic_error& error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
@@ -164,62 +115,12 @@ void Task::onCandidate(shared_ptr<rtc::WebSocket> wws)
 
 bool Task::parseIncomingMessage(char const* data)
 {
-    std::string error;
+    string error;
     if (!decoder->parseJSONMessage(data, error))
     {
         LOG_ERROR_S << "Failed parsing the message, got error: " << error << std::endl;
         return false;
     }
-    return true;
-}
-
-bool Task::getTypeFromMessage(std::string& message)
-{
-    if (!decoder->validateType())
-    {
-        return false;
-    }
-    message = decoder->getType();
-    return true;
-}
-
-bool Task::getIdFromMessage(std::string& message)
-{
-    if (!decoder->validateId())
-    {
-        return false;
-    }
-    message = decoder->getId();
-    return true;
-}
-
-bool Task::getDescriptionFromMessage(std::string& message)
-{
-    if (!decoder->validateDescription())
-    {
-        return false;
-    }
-    message = decoder->getDescription();
-    return true;
-}
-
-bool Task::getCandidateFromMessage(std::string& message)
-{
-    if (!decoder->validateCandidate())
-    {
-        return false;
-    }
-    message = decoder->getCandidate();
-    return true;
-}
-
-bool Task::getMidFromMessage(std::string& message)
-{
-    if (!decoder->validateMid())
-    {
-        return false;
-    }
-    message = decoder->getMid();
     return true;
 }
 
@@ -257,7 +158,7 @@ shared_ptr<rtc::PeerConnection> Task::configurePeerConnection(
             Json::FastWriter fast;
             message["id"] = remote_peer_id;
             message["type"] = description.typeString();
-            message["description"] = std::string(description);
+            message["description"] = string(description);
 
             if (auto ws = make_weak_ptr(wws).lock())
                 ws->send(fast.write(message));
@@ -270,7 +171,7 @@ shared_ptr<rtc::PeerConnection> Task::configurePeerConnection(
             Json::FastWriter fast;
             message["id"] = remote_peer_id;
             message["type"] = "candidate";
-            message["candidate"] = std::string(candidate);
+            message["candidate"] = string(candidate);
             message["mid"] = candidate.mid();
 
             if (auto ws = make_weak_ptr(wws).lock())
@@ -338,7 +239,7 @@ void Task::configureWebSocket()
         });
 
     mWs->onError(
-        [&ws_promise](std::string s)
+        [&ws_promise](string s)
         {
             LOG_INFO_S << "WebSocket error" << std::endl;
             ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(s)));
@@ -352,18 +253,14 @@ void Task::configureWebSocket()
             if (!holds_alternative<string>(data))
                 return;
 
-            if (!parseIncomingMessage(get<std::string>(data).c_str()))
+            if (!parseIncomingMessage(get<string>(data).c_str()))
             {
                 return;
             }
 
-            std::string type;
-            if (!getTypeFromMessage(type))
-            {
-                return;
-            }
+            string type = decoder->getType();
 
-            // Or the peerconnection is already created or we give a offer, creating one.
+            // Ether the peerconnection is already created or we give an offer, creating one.
             if (auto jt = mPeerConnectionMap.find("id"); jt != mPeerConnectionMap.end())
             {
                 mPeerConnection = jt->second;
@@ -379,11 +276,11 @@ void Task::configureWebSocket()
 
             if (type == "answer")
             {
-                onAnswer(mWs);
+                onAnswer();
             }
             else if (type == "candidate")
             {
-                onCandidate(mWs);
+                onCandidate();
             }
         });
 
@@ -393,7 +290,7 @@ void Task::configureWebSocket()
     ws_future.get();
 }
 
-Task::Task(std::string const& name) : TaskBase(name) {}
+Task::Task(string const& name) : TaskBase(name) {}
 
 Task::~Task() {}
 
@@ -434,7 +331,7 @@ void Task::updateHook()
             peer_connection->createDataChannel(label);
 
         peer_connection->onDataChannel(
-            [&data_channel, raw_packet](std::shared_ptr<rtc::DataChannel> incoming)
+            [&data_channel, raw_packet](shared_ptr<rtc::DataChannel> incoming)
             {
                 data_channel = incoming;
 
