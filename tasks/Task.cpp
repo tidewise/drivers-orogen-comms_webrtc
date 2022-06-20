@@ -334,9 +334,13 @@ void Task::updateHook()
             [&data_channel, raw_packet](shared_ptr<rtc::DataChannel> incoming)
             {
                 data_channel = incoming;
-
-                // TODO
-                // data_channel->send();
+                vector<byte> data;
+                data.resize(raw_packet.data.size());
+                for(unsigned int i=0;i<raw_packet.data.size();i++)
+                {
+                    data[i] = static_cast<byte>(raw_packet.data[i]);
+                }
+                data_channel->send(&data.front(), data.size());
             });
     }
 
