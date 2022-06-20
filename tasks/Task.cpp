@@ -310,7 +310,12 @@ void Task::configureDataChannel(
                     }
                     else
                     {
-                        // TODO
+                        std::vector<byte> data_byte = get<binary>(data);
+                        dataPacket.data.resize(data_byte.size());
+                        for (unsigned int i = 0; i < data_byte.size(); i++)
+                        {
+                            dataPacket.data[i] = to_integer<uint8_t>(data_byte[i]);
+                        }
                     }
 
                     _data_out.write(dataPacket);
@@ -326,11 +331,11 @@ void Task::configureWebSocket()
     auto ws_future = ws_promise.get_future();
 
     mWs->onOpen(
-    [&ws_promise]()
-    {
-        LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
-        ws_promise.set_value();
-    });
+        [&ws_promise]()
+        {
+            LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
+            ws_promise.set_value();
+        });
 
     mWs->onError(
         [&ws_promise](std::string s)
@@ -423,7 +428,7 @@ void Task::updateHook()
             createPeerConnection(mWs, _remote_peer_id.get());
 
         // We are the offerer, so create a data channel to initiate the process
-        const std::string label = _data_channel_label.get();
+        string label = _data_channel_label.get();
         LOG_INFO_S << "Creating DataChannel with label \"" << label << "\"" << std::endl;
         shared_ptr<rtc::DataChannel> data_channel =
             peer_connection->createDataChannel(label);
