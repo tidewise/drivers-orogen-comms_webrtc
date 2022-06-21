@@ -116,15 +116,13 @@ namespace comms_webrtc
         void onAnswer();
         void onCandidate();
         void onOffer();
-        void createPeerConnection();
-        void createDataChannel();
+        void createPeerConnectionOnOffer();
         bool parseIncomingMessage(char const* data);
         void configurePeerDataChannel(
             std::shared_ptr<rtc::PeerConnection> const& peer_connection,
             std::string const& remote_peer_id);
         void configureWebSocket();
-        std::shared_ptr<rtc::PeerConnection> getPeerConnection(
-            std::shared_ptr<rtc::WebSocket> const& wws,
+        std::shared_ptr<rtc::PeerConnection> initiatePeerConnection(
             std::string const& remote_peer_id);
     };
 } // namespace comms_webrtc

@@ -65,6 +65,7 @@ struct comms_webrtc::MessageDecoder
 void Task::onOffer()
 {
     string description = decoder->getDescription();
+    createPeerConnectionOnOffer();
 
     try
     {
@@ -122,9 +123,7 @@ bool Task::parseIncomingMessage(char const* data)
     return true;
 }
 
-shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
-    shared_ptr<rtc::WebSocket> const& wws,
-    string const& remote_peer_id)
+shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remote_peer_id)
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
 
@@ -136,7 +135,7 @@ shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
         { LOG_INFO_S << "Gathering State: " << state << std::endl; });
 
     peer_connection->onLocalDescription(
-        [&, wws](rtc::Description description)
+        [&](rtc::Description description)
         {
             Json::Value message;
             Json::FastWriter fast;
@@ -144,12 +143,12 @@ shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
             message["type"] = description.typeString();
             message["description"] = string(description);
 
-            if (auto ws = make_weak_ptr(wws).lock())
+            if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
         });
 
     peer_connection->onLocalCandidate(
-        [&, wws](rtc::Candidate candidate)
+        [&](rtc::Candidate candidate)
         {
             Json::Value message;
             Json::FastWriter fast;
@@ -158,7 +157,7 @@ shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
             message["candidate"] = string(candidate);
             message["mid"] = candidate.mid();
 
-            if (auto ws = make_weak_ptr(wws).lock())
+            if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
         });
 
@@ -176,12 +175,8 @@ void Task::configurePeerDataChannel(
                        << " received with label \"" << data_channel->label() << "\""
                        << std::endl;
 
-            data_channel->onOpen(
-                [&, wdc = make_weak_ptr(data_channel)]()
-                {
-                    if (auto data_channel = wdc.lock())
-                        data_channel->send("DataChannel open");
-                });
+            mDataChannel = data_channel;
+            data_channel->onOpen([&, wdc = make_weak_ptr(data_channel)]() {});
 
             data_channel->onMessage(
                 [&](variant<binary, string> data)
@@ -195,7 +190,7 @@ void Task::configurePeerDataChannel(
                     }
                     else
                     {
-                        std::vector<byte> data_byte = get<binary>(data);
+                        vector<byte> data_byte = get<binary>(data);
                         dataPacket.data.resize(data_byte.size());
                         for (unsigned int i = 0; i < data_byte.size(); i++)
                         {
@@ -207,33 +202,11 @@ void Task::configurePeerDataChannel(
         });
 }
 
-void Task::createPeerConnection()
+void Task::createPeerConnectionOnOffer()
 {
     string remote_peer_id = decoder->getId();
-    mPeerConnection = getPeerConnection(mWs, remote_peer_id);
+    mPeerConnection = initiatePeerConnection(remote_peer_id);
     configurePeerDataChannel(mPeerConnection, remote_peer_id);
-}
-
-void Task::createDataChannel()
-{
-    string label = _data_channel_label.get();
-    mDataChannel = mPeerConnection->createDataChannel(label);
-    mPeerConnection->onDataChannel(
-        [&](shared_ptr<rtc::DataChannel> incoming)
-        {
-            iodrivers_base::RawPacket raw_packet;
-            if (_data_in.read(raw_packet) != RTT::NewData)
-                return;
-
-            mDataChannel = incoming;
-            vector<byte> data;
-            data.resize(raw_packet.data.size());
-            for (unsigned int i = 0; i < raw_packet.data.size(); i++)
-            {
-                data[i] = static_cast<byte>(raw_packet.data[i]);
-            }
-            mDataChannel->send(&data.front(), data.size());
-        });
 }
 
 void Task::configureWebSocket()
@@ -270,20 +243,15 @@ void Task::configureWebSocket()
 
             string type = decoder->getType();
 
-            if (mPeerConnection == nullptr)
-            {
-                createPeerConnection();
-            }
-
             if (type == "offer")
             {
                 onOffer();
             }
-            else if (type == "answer")
+            else if (type == "answer" && mPeerConnection)
             {
                 onAnswer();
             }
-            else if (type == "candidate")
+            else if (type == "candidate" && mPeerConnection)
             {
                 onCandidate();
             }
@@ -319,19 +287,32 @@ bool Task::startHook()
 {
     if (!TaskBase::startHook())
         return false;
+
+    if (!_remote_peer_id.get().empty())
+    {
+        mPeerConnection = initiatePeerConnection(_remote_peer_id.get());
+
+        string label = _data_channel_label.get();
+        mDataChannel = mPeerConnection->createDataChannel(label);
+    }
+
     return true;
 }
 void Task::updateHook()
 {
-    // If not, the peerConnection is already created
-    if (!_remote_peer_id.get().empty() && mPeerConnection == nullptr)
+    if (mDataChannel)
     {
-        createPeerConnection();
-    }
-    // Create dataChannel once, after create the peerConnection
-    if (mDataChannel == nullptr)
-    {
-        createDataChannel();
+        iodrivers_base::RawPacket raw_packet;
+        if (_data_in.read(raw_packet) != RTT::NewData)
+            return;
+
+        vector<byte> data;
+        data.resize(raw_packet.data.size());
+        for (unsigned int i = 0; i < raw_packet.data.size(); i++)
+        {
+            data[i] = static_cast<byte>(raw_packet.data[i]);
+        }
+        mDataChannel->send(&data.front(), data.size());
     }
 
     TaskBase::updateHook();
