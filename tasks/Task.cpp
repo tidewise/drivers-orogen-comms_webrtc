@@ -130,7 +130,7 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
     string const& remote_peer_id)
 {
     shared_ptr<rtc::PeerConnection> peer_connection =
-        configurePeerConnection(wws, remote_peer_id);
+        getPeerConnection(wws, remote_peer_id);
 
     configureDataChannel(peer_connection, remote_peer_id);
 
@@ -138,7 +138,7 @@ shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
     return peer_connection;
 };
 
-shared_ptr<rtc::PeerConnection> Task::configurePeerConnection(
+shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
     shared_ptr<rtc::WebSocket> const& wws,
     string const& remote_peer_id)
 {
