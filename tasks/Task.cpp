@@ -2,8 +2,8 @@
 
 #include "Task.hpp"
 
-using namespace comms_webrtc;
 using namespace iodrivers_base;
+using namespace comms_webrtc;
 using namespace std;
 using namespace rtc;
 
@@ -26,7 +26,8 @@ struct comms_webrtc::MessageDecoder
     {
         if (!jdata.isMember(fieldName))
         {
-            throw invalid_argument("message does not contain the " + fieldName + " field");
+            throw invalid_argument(
+                "message does not contain the " + fieldName + " field");
         }
     }
 
@@ -61,12 +62,9 @@ struct comms_webrtc::MessageDecoder
     }
 };
 
-void Task::onOffer(rtc::shared_ptr<rtc::WebSocket> wws)
+void Task::onOffer()
 {
-    string remote_peer_id = decoder->getId();
     string description = decoder->getDescription();
-    
-    mPeerConnection = createPeerConnection(wws, remote_peer_id);
 
     try
     {
@@ -124,20 +122,6 @@ bool Task::parseIncomingMessage(char const* data)
     return true;
 }
 
-// Create and setup a PeerConnection
-shared_ptr<rtc::PeerConnection> Task::createPeerConnection(
-    shared_ptr<rtc::WebSocket> const& wws,
-    string const& remote_peer_id)
-{
-    shared_ptr<rtc::PeerConnection> peer_connection =
-        getPeerConnection(wws, remote_peer_id);
-
-    configureDataChannel(peer_connection, remote_peer_id);
-
-    mPeerConnectionMap.emplace(remote_peer_id, peer_connection);
-    return peer_connection;
-};
-
 shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
     shared_ptr<rtc::WebSocket> const& wws,
     string const& remote_peer_id)
@@ -181,7 +165,7 @@ shared_ptr<rtc::PeerConnection> Task::getPeerConnection(
     return peer_connection;
 }
 
-void Task::configureDataChannel(
+void Task::configurePeerDataChannel(
     shared_ptr<rtc::PeerConnection> const& peer_connection,
     string const& remote_peer_id)
 {
@@ -218,11 +202,37 @@ void Task::configureDataChannel(
                             dataPacket.data[i] = to_integer<uint8_t>(data_byte[i]);
                         }
                     }
-
                     _data_out.write(dataPacket);
                 });
+        });
+}
 
-            mDataChannelMap.emplace(remote_peer_id, data_channel);
+void Task::createPeerConnection()
+{
+    string remote_peer_id = decoder->getId();
+    mPeerConnection = getPeerConnection(mWs, remote_peer_id);
+    configurePeerDataChannel(mPeerConnection, remote_peer_id);
+}
+
+void Task::createDataChannel()
+{
+    string label = _data_channel_label.get();
+    mDataChannel = mPeerConnection->createDataChannel(label);
+    mPeerConnection->onDataChannel(
+        [&](shared_ptr<rtc::DataChannel> incoming)
+        {
+            iodrivers_base::RawPacket raw_packet;
+            if (_data_in.read(raw_packet) != RTT::NewData)
+                return;
+
+            mDataChannel = incoming;
+            vector<byte> data;
+            data.resize(raw_packet.data.size());
+            for (unsigned int i = 0; i < raw_packet.data.size(); i++)
+            {
+                data[i] = static_cast<byte>(raw_packet.data[i]);
+            }
+            mDataChannel->send(&data.front(), data.size());
         });
 }
 
@@ -260,21 +270,16 @@ void Task::configureWebSocket()
 
             string type = decoder->getType();
 
-            // Ether the peerconnection is already created or we give an offer, creating one.
-            if (auto jt = mPeerConnectionMap.find("id"); jt != mPeerConnectionMap.end())
+            if (mPeerConnection == nullptr)
             {
-                mPeerConnection = jt->second;
-            }
-            else if (type == "offer")
-            {
-                onOffer(mWs);
-            }
-            else
-            {
-                return;
+                createPeerConnection();
             }
 
-            if (type == "answer")
+            if (type == "offer")
+            {
+                onOffer();
+            }
+            else if (type == "answer")
             {
                 onAnswer();
             }
@@ -318,41 +323,19 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
-    RawPacket raw_packet;
-    if (_data_in.read(raw_packet) == RTT::NewData && !_remote_peer_id.get().empty())
+    // If not, the peerConnection is already created
+    if (!_remote_peer_id.get().empty() && mPeerConnection == nullptr)
     {
-        shared_ptr<rtc::PeerConnection> peer_connection =
-            createPeerConnection(mWs, _remote_peer_id.get());
-
-        // We are the offerer, so create a data channel to initiate the process
-        string label = _data_channel_label.get();
-        LOG_INFO_S << "Creating DataChannel with label \"" << label << "\"" << std::endl;
-        shared_ptr<rtc::DataChannel> data_channel =
-            peer_connection->createDataChannel(label);
-
-        peer_connection->onDataChannel(
-            [&data_channel, raw_packet](shared_ptr<rtc::DataChannel> incoming)
-            {
-                data_channel = incoming;
-                vector<byte> data;
-                data.resize(raw_packet.data.size());
-                for(unsigned int i=0;i<raw_packet.data.size();i++)
-                {
-                    data[i] = static_cast<byte>(raw_packet.data[i]);
-                }
-                data_channel->send(&data.front(), data.size());
-            });
+        createPeerConnection();
     }
-    // TODO - If we have data_in, but we don't have remote peer id.
+    // Create dataChannel once, after create the peerConnection
+    if (mDataChannel == nullptr)
+    {
+        createDataChannel();
+    }
 
     TaskBase::updateHook();
 }
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook() { TaskBase::stopHook(); }
-void Task::cleanupHook()
-{
-    mDataChannelMap.clear();
-    mPeerConnectionMap.clear();
-
-    TaskBase::cleanupHook();
-}
+void Task::cleanupHook() { TaskBase::cleanupHook(); }

@@ -112,19 +112,14 @@ namespace comms_webrtc
         MessageDecoder* decoder = nullptr;
         std::shared_ptr<rtc::DataChannel> mDataChannel;
         std::shared_ptr<rtc::PeerConnection> mPeerConnection;
-        std::unordered_map<std::string, std::shared_ptr<rtc::PeerConnection>>
-            mPeerConnectionMap;
-        std::unordered_map<std::string, std::shared_ptr<rtc::DataChannel>>
-            mDataChannelMap;
 
         void onAnswer();
         void onCandidate();
-        void onOffer(std::shared_ptr<rtc::WebSocket> wws);
+        void onOffer();
+        void createPeerConnection();
+        void createDataChannel();
         bool parseIncomingMessage(char const* data);
-        std::shared_ptr<rtc::PeerConnection> createPeerConnection(
-            std::shared_ptr<rtc::WebSocket> const& wws,
-            std::string const& remote_peer_id);
-        void configureDataChannel(
+        void configurePeerDataChannel(
             std::shared_ptr<rtc::PeerConnection> const& peer_connection,
             std::string const& remote_peer_id);
         void configureWebSocket();
