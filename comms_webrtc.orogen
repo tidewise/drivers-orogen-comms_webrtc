@@ -12,6 +12,13 @@ using_library "jsoncpp", typekit: false
 task_context "Task" do
     needs_configuration
 
+    # Peers can be found by:
+    # 1-"one-to-one" request via a provided username, which sends your information
+    # to only the node tied to that username.
+    # 2-"one-to-all" request, which sends your information to everyone on the network.
+    # 3-"one-to-self" request, which sends your information back to yourself.
+    property "protocol_type", "std/string"
+
     # Stun server (if No STUN server is configured,
     # only local hosts and public IP addresses are supported)
     property "stun_server", "std/string"

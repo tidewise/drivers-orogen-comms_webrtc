@@ -108,8 +108,7 @@ namespace comms_webrtc
       private:
         rtc::Configuration mConfig;
         std::shared_ptr<rtc::WebSocket> mWs;
-        std::string mLocalPeerId;
-        MessageDecoder* decoder = nullptr;
+        MessageDecoder* mDecoder = nullptr;
         std::shared_ptr<rtc::DataChannel> mDataChannel;
         std::shared_ptr<rtc::PeerConnection> mPeerConnection;
 
@@ -118,12 +117,10 @@ namespace comms_webrtc
         void onOffer();
         void createPeerConnectionOnOffer();
         bool parseIncomingMessage(char const* data);
-        void configurePeerDataChannel(
-            std::shared_ptr<rtc::PeerConnection> const& peer_connection,
-            std::string const& remote_peer_id);
+        void configurePeerDataChannel(std::string const& remote_peer_id);
         void configureWebSocket();
-        std::shared_ptr<rtc::PeerConnection> initiatePeerConnection(
-            std::string const& remote_peer_id);
+        std::shared_ptr<rtc::PeerConnection>
+        initiatePeerConnection(std::string const& remote_peer_id);
     };
 } // namespace comms_webrtc
 

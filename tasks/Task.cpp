@@ -31,40 +31,49 @@ struct comms_webrtc::MessageDecoder
         }
     }
 
-    string getType()
+    void validateDataFieldPresent(string fieldName)
     {
-        validateFieldPresent("type");
-        return jdata["type"].asString();
+        if (!jdata["data"].isMember(fieldName))
+        {
+            throw invalid_argument(
+                "message does not contain the " + fieldName + " field");
+        }
+    }
+
+    string getActionType()
+    {
+        validateFieldPresent("actiontype");
+        return jdata["actiontype"].asString();
     }
 
     string getId()
     {
-        validateFieldPresent("id");
-        return jdata["id"].asString();
+        validateFieldPresent("to");
+        return jdata["to"].asString();
     }
 
     string getDescription()
     {
-        validateFieldPresent("description");
-        return jdata["description"].asString();
+        validateDataFieldPresent("description");
+        return jdata["data"]["description"].asString();
     }
 
     string getCandidate()
     {
-        validateFieldPresent("candidate");
-        return jdata["candidate"].asString();
+        validateDataFieldPresent("candidate");
+        return jdata["data"]["candidate"].asString();
     }
 
     string getMid()
     {
-        validateFieldPresent("mid");
-        return jdata["mid"].asString();
+        validateDataFieldPresent("mid");
+        return jdata["data"]["mid"].asString();
     }
 };
 
 void Task::onOffer()
 {
-    string description = decoder->getDescription();
+    string description = mDecoder->getDescription();
     createPeerConnectionOnOffer();
 
     try
@@ -81,7 +90,7 @@ void Task::onOffer()
 
 void Task::onAnswer()
 {
-    string description = decoder->getDescription();
+    string description = mDecoder->getDescription();
 
     try
     {
@@ -97,8 +106,8 @@ void Task::onAnswer()
 
 void Task::onCandidate()
 {
-    string candidate = decoder->getCandidate();
-    string mid = decoder->getMid();
+    string candidate = mDecoder->getCandidate();
+    string mid = mDecoder->getMid();
 
     try
     {
@@ -115,7 +124,7 @@ void Task::onCandidate()
 bool Task::parseIncomingMessage(char const* data)
 {
     string error;
-    if (!decoder->parseJSONMessage(data, error))
+    if (!mDecoder->parseJSONMessage(data, error))
     {
         LOG_ERROR_S << "Failed parsing the message, got error: " << error << std::endl;
         return false;
@@ -139,9 +148,10 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remot
         {
             Json::Value message;
             Json::FastWriter fast;
-            message["id"] = remote_peer_id;
-            message["type"] = description.typeString();
-            message["description"] = string(description);
+            message["protocol"] = mDecoder->getActionType();
+            message["to"] = remote_peer_id;
+            message["actiontype"] = description.typeString();
+            message["data"]["description"] = string(description);
 
             if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
@@ -152,10 +162,11 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remot
         {
             Json::Value message;
             Json::FastWriter fast;
-            message["id"] = remote_peer_id;
-            message["type"] = "candidate";
-            message["candidate"] = string(candidate);
-            message["mid"] = candidate.mid();
+            message["protocol"] = mDecoder->getActionType();
+            message["to"] = remote_peer_id;
+            message["actiontype"] = "candidate";
+            message["data"]["candidate"] = string(candidate);
+            message["data"]["mid"] = candidate.mid();
 
             if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
@@ -164,11 +175,9 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remot
     return peer_connection;
 }
 
-void Task::configurePeerDataChannel(
-    shared_ptr<rtc::PeerConnection> const& peer_connection,
-    string const& remote_peer_id)
+void Task::configurePeerDataChannel(string const& remote_peer_id)
 {
-    peer_connection->onDataChannel(
+    mPeerConnection->onDataChannel(
         [&](shared_ptr<rtc::DataChannel> data_channel)
         {
             LOG_INFO_S << "DataChannel from " << remote_peer_id
@@ -204,9 +213,9 @@ void Task::configurePeerDataChannel(
 
 void Task::createPeerConnectionOnOffer()
 {
-    string remote_peer_id = decoder->getId();
+    string remote_peer_id = mDecoder->getId();
     mPeerConnection = initiatePeerConnection(remote_peer_id);
-    configurePeerDataChannel(mPeerConnection, remote_peer_id);
+    configurePeerDataChannel(remote_peer_id);
 }
 
 void Task::configureWebSocket()
@@ -241,17 +250,17 @@ void Task::configureWebSocket()
                 return;
             }
 
-            string type = decoder->getType();
+            string actiontype = mDecoder->getActionType();
 
-            if (type == "offer")
+            if (actiontype == "offer")
             {
                 onOffer();
             }
-            else if (type == "answer" && mPeerConnection)
+            else if (actiontype == "answer" && mPeerConnection)
             {
                 onAnswer();
             }
-            else if (type == "candidate" && mPeerConnection)
+            else if (actiontype == "candidate" && mPeerConnection)
             {
                 onCandidate();
             }
@@ -277,7 +286,6 @@ bool Task::configureHook()
         return false;
 
     mConfig.iceServers.emplace_back(_stun_server.get());
-    mLocalPeerId = _local_peer_id.get();
 
     configureWebSocket();
 
