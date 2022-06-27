@@ -133,7 +133,10 @@ void Task::configurePeerDataChannel(string const& remote_peer_id)
 
                     if (holds_alternative<string>(data))
                     {
-                        // TODO
+                        string data_string = get<string>(data);
+                        vector<uint8_t> new_data(data_string.begin(), data_string.end());
+                        dataPacket.data.resize(new_data.size());
+                        dataPacket.data = new_data;
                     }
                     else
                     {
