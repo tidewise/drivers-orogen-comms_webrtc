@@ -5,13 +5,12 @@
 
 #include "base-logging/Logging.hpp"
 #include "comms_webrtc/TaskBase.hpp"
+#include "comms_webrtcTypes.hpp"
 #include "rtc/rtc.hpp"
 #include "json/json.h"
 
 namespace comms_webrtc
 {
-    struct MessageDecoder;
-
     /*! \class Task
      * \brief The task context provides and requires services. It uses an ExecutionEngine
      to perform its functions.
@@ -108,7 +107,7 @@ namespace comms_webrtc
       private:
         rtc::Configuration mConfig;
         std::shared_ptr<rtc::WebSocket> mWs;
-        MessageDecoder* mDecoder = nullptr;
+        comms_webrtc::MessageDecoder* mDecoder = nullptr;
         std::shared_ptr<rtc::DataChannel> mDataChannel;
         std::shared_ptr<rtc::PeerConnection> mPeerConnection;
 

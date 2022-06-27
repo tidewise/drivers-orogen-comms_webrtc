@@ -9,68 +9,6 @@ using namespace rtc;
 
 template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 
-struct comms_webrtc::MessageDecoder
-{
-    Json::Value jdata;
-    Json::CharReaderBuilder rbuilder;
-    unique_ptr<Json::CharReader> const reader;
-
-    MessageDecoder() : reader(rbuilder.newCharReader()) {}
-
-    bool parseJSONMessage(char const* data, string& errors)
-    {
-        return reader->parse(data, data + strlen(data), &jdata, &errors);
-    }
-
-    void validateFieldPresent(string fieldName)
-    {
-        if (!jdata.isMember(fieldName))
-        {
-            throw invalid_argument(
-                "message does not contain the " + fieldName + " field");
-        }
-    }
-
-    void validateDataFieldPresent(string fieldName)
-    {
-        if (!jdata["data"].isMember(fieldName))
-        {
-            throw invalid_argument(
-                "message does not contain the " + fieldName + " field");
-        }
-    }
-
-    string getActionType()
-    {
-        validateFieldPresent("actiontype");
-        return jdata["actiontype"].asString();
-    }
-
-    string getId()
-    {
-        validateFieldPresent("to");
-        return jdata["to"].asString();
-    }
-
-    string getDescription()
-    {
-        validateDataFieldPresent("description");
-        return jdata["data"]["description"].asString();
-    }
-
-    string getCandidate()
-    {
-        validateDataFieldPresent("candidate");
-        return jdata["data"]["candidate"].asString();
-    }
-
-    string getMid()
-    {
-        validateDataFieldPresent("mid");
-        return jdata["data"]["mid"].asString();
-    }
-};
-
 void Task::onOffer()
 {
     string description = mDecoder->getDescription();
