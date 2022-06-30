@@ -106,8 +106,8 @@ namespace comms_webrtc
 
       private:
         rtc::Configuration mConfig;
+        comms_webrtc::MessageDecoder mDecoder;
         std::shared_ptr<rtc::WebSocket> mWs;
-        comms_webrtc::MessageDecoder* mDecoder = nullptr;
         std::shared_ptr<rtc::DataChannel> mDataChannel;
         std::shared_ptr<rtc::PeerConnection> mPeerConnection;
 

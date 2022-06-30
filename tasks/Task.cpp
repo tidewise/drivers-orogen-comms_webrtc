@@ -11,7 +11,7 @@ template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 
 void Task::onOffer()
 {
-    string description = mDecoder->getDescription();
+    string description = mDecoder.getDescription();
     createPeerConnectionOnOffer();
 
     try
@@ -28,7 +28,7 @@ void Task::onOffer()
 
 void Task::onAnswer()
 {
-    string description = mDecoder->getDescription();
+    string description = mDecoder.getDescription();
 
     try
     {
@@ -44,8 +44,8 @@ void Task::onAnswer()
 
 void Task::onCandidate()
 {
-    string candidate = mDecoder->getCandidate();
-    string mid = mDecoder->getMid();
+    string candidate = mDecoder.getCandidate();
+    string mid = mDecoder.getMid();
 
     try
     {
@@ -62,7 +62,7 @@ void Task::onCandidate()
 bool Task::parseIncomingMessage(char const* data)
 {
     string error;
-    if (!mDecoder->parseJSONMessage(data, error))
+    if (!mDecoder.parseJSONMessage(data, error))
     {
         LOG_ERROR_S << "Failed parsing the message, got error: " << error << std::endl;
         return false;
@@ -86,7 +86,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remot
         {
             Json::Value message;
             Json::FastWriter fast;
-            message["protocol"] = mDecoder->getActionType();
+            message["protocol"] = mDecoder.getActionType();
             message["to"] = remote_peer_id;
             message["actiontype"] = description.typeString();
             message["data"]["description"] = string(description);
@@ -100,7 +100,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const& remot
         {
             Json::Value message;
             Json::FastWriter fast;
-            message["protocol"] = mDecoder->getActionType();
+            message["protocol"] = mDecoder.getActionType();
             message["to"] = remote_peer_id;
             message["actiontype"] = "candidate";
             message["data"]["candidate"] = string(candidate);
@@ -154,7 +154,7 @@ void Task::configurePeerDataChannel(string const& remote_peer_id)
 
 void Task::createPeerConnectionOnOffer()
 {
-    string remote_peer_id = mDecoder->getId();
+    string remote_peer_id = mDecoder.getId();
     mPeerConnection = initiatePeerConnection(remote_peer_id);
     configurePeerDataChannel(remote_peer_id);
 }
@@ -191,7 +191,7 @@ void Task::configureWebSocket()
                 return;
             }
 
-            string actiontype = mDecoder->getActionType();
+            string actiontype = mDecoder.getActionType();
 
             if (actiontype == "offer")
             {
@@ -227,6 +227,7 @@ bool Task::configureHook()
         return false;
 
     mConfig.iceServers.emplace_back(_stun_server.get());
+    mWs = std::make_shared<rtc::WebSocket>();
 
     configureWebSocket();
 

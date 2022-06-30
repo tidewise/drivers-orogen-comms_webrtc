@@ -20,7 +20,7 @@ namespace comms_webrtc {
             return reader->parse(data, data + strlen(data), &jdata, &errors);
         }
 
-        void validateFieldPresent(std::string fieldName)
+        void validateFieldPresent(std::string const& fieldName)
         {
             if (!jdata.isMember(fieldName))
             {
@@ -29,7 +29,7 @@ namespace comms_webrtc {
             }
         }
 
-        void validateDataFieldPresent(std::string fieldName)
+        void validateDataFieldPresent(std::string const& fieldName)
         {
             if (!jdata["data"].isMember(fieldName))
             {
