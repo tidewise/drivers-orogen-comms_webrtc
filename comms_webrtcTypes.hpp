@@ -38,6 +38,12 @@ namespace comms_webrtc {
             }
         }
 
+        std::string getProtocol()
+        {
+            validateFieldPresent("protocol");
+            return jdata["protocol"].asString();
+        }
+
         std::string getActionType()
         {
             validateFieldPresent("actiontype");

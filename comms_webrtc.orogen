@@ -17,7 +17,7 @@ task_context "Task" do
     # to only the node tied to that username.
     # 2-"one-to-all" request, which sends your information to everyone on the network.
     # 3-"one-to-self" request, which sends your information back to yourself.
-    property "protocol_type", "std/string"
+    property "protocol", "std/string"
 
     # Stun server (if No STUN server is configured,
     # only local hosts and public IP addresses are supported)
