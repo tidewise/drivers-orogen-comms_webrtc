@@ -13,7 +13,7 @@ weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 void Task::onOffer()
 {
     string description = mDecoder.getDescription();
-    createPeerConnectionOnOffer();
+    createPeerConnection();
 
     try
     {
@@ -30,6 +30,7 @@ void Task::onOffer()
 void Task::onAnswer()
 {
     string description = mDecoder.getDescription();
+    createPeerConnection();
 
     try
     {
@@ -45,8 +46,9 @@ void Task::onAnswer()
 
 void Task::onCandidate()
 {
-    string candidate = mDecoder.getCandidate();
     string mid = mDecoder.getMid();
+    string candidate = mDecoder.getCandidate();
+    createPeerConnection();
 
     try
     {
@@ -71,6 +73,14 @@ bool Task::parseIncomingMessage(char const *data)
     return true;
 }
 
+void Task::createPeerConnection()
+{
+    string protocol = mDecoder.getProtocol();
+    string remote_peer_id = mDecoder.getId();
+    mPeerConnection = initiatePeerConnection(protocol, remote_peer_id);
+    configurePeerDataChannel(remote_peer_id);
+}
+
 shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &protocol, string const &remote_peer_id)
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
@@ -83,29 +93,29 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &proto
         { LOG_INFO_S << "Gathering State: " << state << std::endl; });
 
     peer_connection->onLocalDescription(
-        [&](rtc::Description description)
+        [&, protocol, remote_peer_id](rtc::Description description)
         {
             Json::Value message;
             Json::FastWriter fast;
             message["protocol"] = protocol;
             message["to"] = remote_peer_id;
             message["actiontype"] = description.typeString();
-            message["data"]["description"] = string(description);
+            message["description"] = string(description);
 
             if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
         });
 
     peer_connection->onLocalCandidate(
-        [&](rtc::Candidate candidate)
+        [&, protocol, remote_peer_id](rtc::Candidate candidate)
         {
             Json::Value message;
             Json::FastWriter fast;
             message["protocol"] = protocol;
             message["to"] = remote_peer_id;
             message["actiontype"] = "candidate";
-            message["data"]["candidate"] = string(candidate);
-            message["data"]["mid"] = candidate.mid();
+            message["candidate"] = string(candidate);
+            message["mid"] = candidate.mid();
 
             if (auto ws = make_weak_ptr(mWs).lock())
                 ws->send(fast.write(message));
@@ -153,14 +163,6 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
         });
 }
 
-void Task::createPeerConnectionOnOffer()
-{
-    string protocol = mDecoder.getProtocol();
-    string remote_peer_id = mDecoder.getId();
-    mPeerConnection = initiatePeerConnection(protocol, remote_peer_id);
-    configurePeerDataChannel(remote_peer_id);
-}
-
 void Task::configureWebSocket()
 {
     promise<void> ws_promise;
@@ -202,11 +204,11 @@ void Task::configureWebSocket()
             {
                 onOffer();
             }
-            else if (actiontype == "answer" && mPeerConnection)
+            else if (actiontype == "answer")
             {
                 onAnswer();
             }
-            else if (actiontype == "candidate" && mPeerConnection)
+            else if (actiontype == "candidate")
             {
                 onCandidate();
             }

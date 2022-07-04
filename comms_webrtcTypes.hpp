@@ -29,15 +29,6 @@ namespace comms_webrtc {
             }
         }
 
-        void validateDataFieldPresent(std::string const& fieldName)
-        {
-            if (!jdata["data"].isMember(fieldName))
-            {
-                std::invalid_argument(
-                    "message does not contain the " + fieldName + " field");
-            }
-        }
-
         std::string getProtocol()
         {
             validateFieldPresent("protocol");
@@ -58,20 +49,20 @@ namespace comms_webrtc {
 
         std::string getDescription()
         {
-            validateDataFieldPresent("description");
-            return jdata["data"]["description"].asString();
+            validateFieldPresent("description");
+            return jdata["description"].asString();
         }
 
         std::string getCandidate()
         {
-            validateDataFieldPresent("candidate");
-            return jdata["data"]["candidate"].asString();
+            validateFieldPresent("candidate");
+            return jdata["candidate"].asString();
         }
 
         std::string getMid()
         {
-            validateDataFieldPresent("mid");
-            return jdata["data"]["mid"].asString();
+            validateFieldPresent("mid");
+            return jdata["mid"].asString();
         }
     };
 }

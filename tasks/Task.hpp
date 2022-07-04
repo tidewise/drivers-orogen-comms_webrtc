@@ -114,7 +114,7 @@ namespace comms_webrtc
     void onAnswer();
     void onCandidate();
     void onOffer();
-    void createPeerConnectionOnOffer();
+    void createPeerConnection();
     bool parseIncomingMessage(char const *data);
     void configurePeerDataChannel(std::string const &remote_peer_id);
     void configureWebSocket();
