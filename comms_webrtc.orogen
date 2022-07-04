@@ -19,8 +19,7 @@ task_context "Task" do
     # 3-"one-to-self" request, which sends your information back to yourself.
     property "protocol", "std/string"
 
-    # Stun server (if No STUN server is configured,
-    # only local hosts and public IP addresses are supported)
+    # Stun server (e.g stun:stun.l.google.com:19302)
     property "stun_server", "std/string"
 
     # Local peer id
@@ -34,7 +33,7 @@ task_context "Task" do
     # Data channel label
     property "data_channel_label", "std/string"
 
-    # Websocket server name (e.g. wss://signalserverhost)
+    # Websocket server name (e.g. 127.0.0.1:3012)
     property "websocket_server_name", "std/string"
 
     # Rawdata in
