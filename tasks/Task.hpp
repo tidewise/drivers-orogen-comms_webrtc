@@ -106,6 +106,7 @@ namespace comms_webrtc
 
   private:
     rtc::Configuration mConfig;
+    comms_webrtc::PeerConnection mState;
     comms_webrtc::MessageDecoder mDecoder;
     std::shared_ptr<rtc::WebSocket> mWs;
     std::shared_ptr<rtc::DataChannel> mDataChannel;

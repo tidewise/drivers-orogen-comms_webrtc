@@ -7,6 +7,40 @@
 #include "memory"
 
 namespace comms_webrtc {
+
+    enum ConnectionState
+    {
+        NewConnection,
+        Connecting,
+        Connected,
+        Disconnected,
+        Failed,
+        Closed
+    };
+
+    enum GatheringState
+    {
+        NewGathering,
+        InProgress,
+        Complete
+    };
+
+    enum SignalingState
+    {
+        Stable,
+        HaveLocalOffer,
+        HaveRemoteOffer,
+        HaveLocalPranswer,
+        HaveRemotePranswer
+    };
+
+    struct PeerConnection
+    {
+        ConnectionState state;
+        GatheringState gathering_state;
+        SignalingState signaling_state;
+    };
+
     struct MessageDecoder
     {
         Json::Value jdata;

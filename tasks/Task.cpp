@@ -85,12 +85,63 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &proto
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
 
-    peer_connection->onStateChange([](rtc::PeerConnection::State state)
-                                   { LOG_INFO_S << "State: " << state << std::endl; });
+    peer_connection->onStateChange(
+        [&](rtc::PeerConnection::State state)
+        {
+            switch (state)
+            {
+            case rtc::PeerConnection::State::Disconnected:
+                mState.state = Disconnected;
+            case rtc::PeerConnection::State::Closed:
+                mState.state = Closed;
+            case rtc::PeerConnection::State::Connected:
+                mState.state = Connected;
+            case rtc::PeerConnection::State::Connecting:
+                mState.state = Connecting;
+            case rtc::PeerConnection::State::Failed:
+                mState.state = Failed;
+            case rtc::PeerConnection::State::New:
+                mState.state = NewConnection;
+            default:
+                break;
+            }
+        });
 
     peer_connection->onGatheringStateChange(
-        [](rtc::PeerConnection::GatheringState state)
-        { LOG_INFO_S << "Gathering State: " << state << std::endl; });
+        [&](rtc::PeerConnection::GatheringState state)
+        {
+            switch (state)
+            {
+            case rtc::PeerConnection::GatheringState::Complete:
+                mState.gathering_state = Complete;
+            case rtc::PeerConnection::GatheringState::InProgress:
+                mState.gathering_state = InProgress;
+            case rtc::PeerConnection::GatheringState::New:
+                mState.gathering_state = NewGathering;
+            default:
+                break;
+            }
+        });
+
+    peer_connection->onSignalingStateChange(
+        [&](rtc::PeerConnection::SignalingState state)
+        {
+            switch (state)
+            {
+            case rtc::PeerConnection::SignalingState::HaveLocalOffer:
+                mState.signaling_state = HaveLocalOffer;
+            case rtc::PeerConnection::SignalingState::HaveLocalPranswer:
+                mState.signaling_state = HaveLocalPranswer;
+            case rtc::PeerConnection::SignalingState::HaveRemoteOffer:
+                mState.signaling_state = HaveRemoteOffer;
+            case rtc::PeerConnection::SignalingState::HaveRemotePranswer:
+                mState.signaling_state = HaveRemotePranswer;
+            case rtc::PeerConnection::SignalingState::Stable:
+                mState.signaling_state = Stable;
+            default:
+                break;
+            }
+        });
 
     peer_connection->onLocalDescription(
         [&, protocol, remote_peer_id](rtc::Description description)
@@ -271,6 +322,8 @@ void Task::updateHook()
         }
         mDataChannel->send(&data.front(), data.size());
     }
+
+    _status.write(mState);
 
     TaskBase::updateHook();
 }
