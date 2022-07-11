@@ -29,11 +29,45 @@ namespace comms_webrtc
         HaveRemotePranswer
     };
 
+    enum LocalDescription
+    {
+        NoDescription,
+        NewDescription
+    };
+
+    enum LocalCandidate
+    {
+        NoCandidate,
+        NewCandidate
+    };
+
     struct PeerConnection
     {
-        ConnectionState state;
-        GatheringState gathering_state;
-        SignalingState signaling_state;
+        comms_webrtc::ConnectionState state;
+        comms_webrtc::GatheringState gathering_state;
+        comms_webrtc::SignalingState signaling_state;
+        comms_webrtc::LocalDescription local_description;
+        comms_webrtc::LocalCandidate local_candidate;
+    };
+
+    enum Datachannel
+    {
+        DcClosed,
+        DcOpened,
+        DcFailed
+    };
+
+    enum WebSocket
+    {
+        WsClosed,
+        WsOpened,
+        WsFailed
+    };
+    struct WebRTCState
+    {
+        comms_webrtc::PeerConnection peer_connection;
+        comms_webrtc::Datachannel data_channel;
+        comms_webrtc::WebSocket web_socket;
     };
 }
 

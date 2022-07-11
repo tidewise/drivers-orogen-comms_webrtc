@@ -36,7 +36,7 @@ task_context "Task" do
     output_port "data_out", "iodrivers_base/RawPacket"
 
     # Status output
-    output_port "status", "comms_webrtc/PeerConnection"
+    output_port "status", "comms_webrtc/WebRTCState"
 
     port_driven
 end
