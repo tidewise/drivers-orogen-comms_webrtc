@@ -13,7 +13,7 @@ describe OroGen.comms_webrtc.Task do
         syskit_stub_conf(OroGen.comms_webrtc.Task, "task1", "task2")
 
         @task1 = syskit_deploy(
-            OroGen.comms_webrtc.Task.with_conf("task1").deployed_as_unmanaged("task1")
+            OroGen.comms_webrtc.Task.with_conf("task1").deployed_as("task1")
         )
         @task1.properties.protocol = "one-to-one"
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"

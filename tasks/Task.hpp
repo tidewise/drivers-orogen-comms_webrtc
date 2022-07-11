@@ -6,6 +6,7 @@
 #include "base-logging/Logging.hpp"
 #include "comms_webrtc/TaskBase.hpp"
 #include "comms_webrtcTypes.hpp"
+#include "MessageDecoder.hpp"
 #include "rtc/rtc.hpp"
 #include "json/json.h"
 
@@ -116,11 +117,11 @@ namespace comms_webrtc
     void onCandidate();
     void onOffer();
     void createPeerConnection();
-    bool parseIncomingMessage(char const *data);
+    void parseIncomingMessage(char const *data);
     void configurePeerDataChannel(std::string const &remote_peer_id);
     void configureWebSocket();
     std::shared_ptr<rtc::PeerConnection>
-    initiatePeerConnection(std::string const &protocol, std::string const &remote_peer_id);
+    initiatePeerConnection(std::string const &remote_peer_id);
   };
 } // namespace comms_webrtc
 

@@ -9,7 +9,4 @@
   <depend package="jsoncpp"/>
 
   <test_depend package="tools/syskit" />
-  <test_depend package="tools/libdatachannel" />
-  <test_depend package="drivers/orogen/iodrivers_base" />
-  <test_depend package="jsoncpp" />
 </package>

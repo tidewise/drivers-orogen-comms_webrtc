@@ -6,18 +6,11 @@ import_types_from "comms_webrtcTypes.hpp"
 import_types_from "iodrivers_base"
 import_types_from "base"
 
-using_library "libdatachannel"
-using_library "jsoncpp", typekit: true
+using_library "libdatachannel", typekit: false
+using_library "jsoncpp", typekit: false
 
 task_context "Task" do
     needs_configuration
-
-    # Peers can be found by:
-    # 1-"one-to-one" request via a provided username, which sends your information
-    # to only the node tied to that username.
-    # 2-"one-to-all" request, which sends your information to everyone on the network.
-    # 3-"one-to-self" request, which sends your information back to yourself.
-    property "protocol", "std/string"
 
     # Stun server (e.g stun:stun.l.google.com:19302)
     property "stun_server", "std/string"
@@ -34,7 +27,7 @@ task_context "Task" do
     property "data_channel_label", "std/string"
 
     # Websocket server name (e.g. 127.0.0.1:3012)
-    property "websocket_server_name", "std/string"
+    property "signaling_server_name", "std/string"
 
     # Rawdata in
     input_port "data_in", "iodrivers_base/RawPacket"
