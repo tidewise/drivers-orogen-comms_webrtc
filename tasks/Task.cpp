@@ -311,6 +311,12 @@ bool Task::configureHook()
     mConfig.iceServers.emplace_back(_stun_server.get());
     mWs = std::make_shared<rtc::WebSocket>();
     mState.web_socket = WsClosed;
+    mState.data_channel = DcClosed;
+    mState.peer_connection.gathering_state = InProgress;
+    mState.peer_connection.local_candidate = NoCandidate;
+    mState.peer_connection.local_description = NoDescription;
+    mState.peer_connection.signaling_state = Stable;
+    mState.peer_connection.state = Closed;
 
     configureWebSocket();
 
@@ -321,7 +327,6 @@ bool Task::startHook()
     if (!TaskBase::startHook())
         return false;
 
-    mState.data_channel = DcClosed;
     if (!_remote_peer_id.get().empty())
     {
         mPeerConnection = initiatePeerConnection(_remote_peer_id.get());
@@ -334,7 +339,7 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
-    if (mDataChannel)
+    if (mDataChannel && mDataChannel->isOpen())
     {
         iodrivers_base::RawPacket raw_packet;
         if (_data_in.read(raw_packet) != RTT::NewData)
@@ -346,11 +351,7 @@ void Task::updateHook()
         {
             data[i] = static_cast<byte>(raw_packet.data[i]);
         }
-
-        if(mState.data_channel == DcOpened)
-        {
-            mDataChannel->send(&data.front(), data.size());
-        }
+        mDataChannel->send(&data.front(), data.size());
     }
 
     _status.write(mState);
