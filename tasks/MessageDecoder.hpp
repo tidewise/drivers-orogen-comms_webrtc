@@ -4,7 +4,6 @@
 #include "json/json.h"
 #include "stdio.h"
 #include "string.h"
-#include "memory"
 
 namespace comms_webrtc
 {
@@ -21,18 +20,9 @@ namespace comms_webrtc
             return reader->parse(data, data + strlen(data), &jdata, &errors);
         }
 
-        void validateFieldPresent(std::string const &fieldName)
+        void validateFieldPresent(Json::Value const &value, std::string const &fieldName)
         {
-            if (!jdata.isMember(fieldName))
-            {
-                throw std::invalid_argument(
-                    "message does not contain the " + fieldName + " field");
-            }
-        }
-
-        void validateDataFieldPresent(std::string const &fieldName)
-        {
-            if (!jdata["data"].isMember(fieldName))
+            if (!value.isMember(fieldName))
             {
                 throw std::invalid_argument(
                     "message does not contain the " + fieldName + " field");
@@ -41,31 +31,34 @@ namespace comms_webrtc
 
         std::string getActionType()
         {
-            validateFieldPresent("action");
+            validateFieldPresent(jdata, "action");
             return jdata["action"].asString();
         }
 
         std::string getId()
         {
-            validateFieldPresent("to");
+            validateFieldPresent(jdata, "to");
             return jdata["to"].asString();
         }
 
         std::string getDescription()
         {
-            validateDataFieldPresent("description");
+            validateFieldPresent(jdata, "data");
+            validateFieldPresent(jdata["data"], "description");
             return jdata["data"]["description"].asString();
         }
 
         std::string getCandidate()
         {
-            validateDataFieldPresent("candidate");
+            validateFieldPresent(jdata, "data");
+            validateFieldPresent(jdata["data"], "candidate");
             return jdata["data"]["candidate"].asString();
         }
 
         std::string getMid()
         {
-            validateDataFieldPresent("mid");
+            validateFieldPresent(jdata, "data");
+            validateFieldPresent(jdata["data"], "mid");
             return jdata["data"]["mid"].asString();
         }
     };

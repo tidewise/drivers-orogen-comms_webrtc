@@ -29,35 +29,35 @@ namespace comms_webrtc
         HaveRemotePranswer
     };
 
-    enum LocalDescription
+    enum LocalDescriptionState
     {
         NoDescription,
         NewDescription
     };
 
-    enum LocalCandidate
+    enum LocalCandidateState
     {
         NoCandidate,
         NewCandidate
     };
 
-    struct PeerConnection
+    struct PeerConnectionState
     {
         comms_webrtc::ConnectionState state;
         comms_webrtc::GatheringState gathering_state;
         comms_webrtc::SignalingState signaling_state;
-        comms_webrtc::LocalDescription local_description;
-        comms_webrtc::LocalCandidate local_candidate;
+        comms_webrtc::LocalDescriptionState local_description;
+        comms_webrtc::LocalCandidateState local_candidate;
     };
 
-    enum Datachannel
+    enum DatachannelState
     {
         DcClosed,
         DcOpened,
         DcFailed
     };
 
-    enum WebSocket
+    enum WebSocketState
     {
         WsClosed,
         WsOpened,
@@ -65,9 +65,9 @@ namespace comms_webrtc
     };
     struct WebRTCState
     {
-        comms_webrtc::PeerConnection peer_connection;
-        comms_webrtc::Datachannel data_channel;
-        comms_webrtc::WebSocket web_socket;
+        comms_webrtc::PeerConnectionState peer_connection;
+        comms_webrtc::DatachannelState data_channel;
+        comms_webrtc::WebSocketState web_socket;
     };
 }
 
