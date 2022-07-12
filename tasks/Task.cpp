@@ -144,7 +144,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
         [&, remote_peer_id](rtc::Description description)
         {
             Json::Value message;
-            message["protocol"] = "one_to_one";
+            message["protocol"] = "one-to-one";
             message["to"] = remote_peer_id;
             message["action"] = description.typeString();
             message["data"]["description"] = string(description);
@@ -165,7 +165,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
         [&, remote_peer_id](rtc::Candidate candidate)
         {
             Json::Value message;
-            message["protocol"] = "one_to_one";
+            message["protocol"] = "one-to-one";
             message["to"] = remote_peer_id;
             message["action"] = "candidate";
             message["data"]["candidate"] = string(candidate);
