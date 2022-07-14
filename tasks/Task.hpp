@@ -106,13 +106,19 @@ namespace comms_webrtc
     void cleanupHook();
 
   private:
+
+    double mRemotePeerAnswerReceived;
     rtc::Configuration mConfig;
     comms_webrtc::WebRTCState mState;
     comms_webrtc::MessageDecoder mDecoder;
+    std::promise<void> mDataChannelPromise;
+    std::promise<void> mWaitRemotePeerPromise;
     std::shared_ptr<rtc::WebSocket> mWs;
     std::shared_ptr<rtc::DataChannel> mDataChannel;
     std::shared_ptr<rtc::PeerConnection> mPeerConnection;
 
+    void ping();
+    void pong();
     void onAnswer();
     void onCandidate();
     void onOffer();

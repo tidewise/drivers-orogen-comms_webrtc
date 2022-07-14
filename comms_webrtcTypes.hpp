@@ -5,6 +5,7 @@ namespace comms_webrtc
 {
     enum ConnectionState
     {
+        NoConnection,
         NewConnection,
         Connecting,
         Connected,
@@ -15,6 +16,7 @@ namespace comms_webrtc
 
     enum GatheringState
     {
+        NoGathering,
         NewGathering,
         InProgress,
         Complete
@@ -22,6 +24,7 @@ namespace comms_webrtc
 
     enum SignalingState
     {
+        NoSignaling,
         Stable,
         HaveLocalOffer,
         HaveRemoteOffer,
@@ -43,11 +46,11 @@ namespace comms_webrtc
 
     struct PeerConnectionState
     {
-        comms_webrtc::ConnectionState state;
-        comms_webrtc::GatheringState gathering_state;
-        comms_webrtc::SignalingState signaling_state;
-        comms_webrtc::LocalDescriptionState local_description;
-        comms_webrtc::LocalCandidateState local_candidate;
+        ConnectionState state = NoConnection;
+        GatheringState gathering_state = NoGathering;
+        SignalingState signaling_state = NoSignaling;
+        LocalDescriptionState local_description = NoDescription;
+        LocalCandidateState local_candidate = NoCandidate;
     };
 
     enum DatachannelState
@@ -65,9 +68,11 @@ namespace comms_webrtc
     };
     struct WebRTCState
     {
-        comms_webrtc::PeerConnectionState peer_connection;
-        comms_webrtc::DatachannelState data_channel;
-        comms_webrtc::WebSocketState web_socket;
+        PeerConnectionState peer_connection;
+        DatachannelState data_channel = DcClosed;
+        WebSocketState web_socket = WsClosed;
+
+        WebRTCState() {}
     };
 }
 

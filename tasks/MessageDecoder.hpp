@@ -35,10 +35,17 @@ namespace comms_webrtc
             return jdata["action"].asString();
         }
 
-        std::string getId()
+        std::string getTo()
         {
             validateFieldPresent(jdata, "to");
             return jdata["to"].asString();
+        }
+
+        std::string getFrom()
+        {
+            validateFieldPresent(jdata, "data");
+            validateFieldPresent(jdata["data"], "from");
+            return jdata["data"]["from"].asString();
         }
 
         std::string getDescription()

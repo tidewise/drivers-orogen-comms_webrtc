@@ -31,18 +31,17 @@ describe OroGen.comms_webrtc.Task do
         @task2.properties.signaling_server_name = "127.0.0.1:3012"
     end
 
-    it "changes message between the tasks" do
-        syskit_configure_and_start(task1)
-        syskit_configure_and_start(task2)
+    it "configure and starts the tasks" do
+        syskit_configure(task1)
+        syskit_configure(task2)
 
-        data_in = Types.iodrivers_base.RawPacket.new
-        data_in.time = Time.now
-        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
-
-        task1_output = expect_execution do
-            syskit_write task1.data_in_port, data_in
+        expect_execution do
+            task1.start!
+            task2.start!
         end.to do
-            have_one_new_sample(task1.status_port)
+            emit task1.start_event
+            emit task2.start_event
         end
+
     end
 end

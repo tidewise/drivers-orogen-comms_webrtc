@@ -30,7 +30,6 @@ void Task::onOffer()
 void Task::onAnswer()
 {
     string description = mDecoder.getDescription();
-    createPeerConnection();
 
     try
     {
@@ -48,7 +47,6 @@ void Task::onCandidate()
 {
     string mid = mDecoder.getMid();
     string candidate = mDecoder.getCandidate();
-    createPeerConnection();
 
     try
     {
@@ -73,7 +71,7 @@ void Task::parseIncomingMessage(char const *data)
 
 void Task::createPeerConnection()
 {
-    string remote_peer_id = mDecoder.getId();
+    string remote_peer_id = mDecoder.getFrom();
     mPeerConnection = initiatePeerConnection(remote_peer_id);
     configurePeerDataChannel(remote_peer_id);
 }
@@ -147,6 +145,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
             message["protocol"] = "one-to-one";
             message["to"] = remote_peer_id;
             message["action"] = description.typeString();
+            message["data"]["from"] = _local_peer_id.get();
             message["data"]["description"] = string(description);
 
             if (auto ws = make_weak_ptr(mWs).lock())
@@ -168,6 +167,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
             message["protocol"] = "one-to-one";
             message["to"] = remote_peer_id;
             message["action"] = "candidate";
+            message["data"]["from"] = _local_peer_id.get();
             message["data"]["candidate"] = string(candidate);
             message["data"]["mid"] = candidate.mid();
 
@@ -199,6 +199,7 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
                                << " received with label \"" << data_channel->label() << "\""
                                << std::endl;
                     mState.data_channel = DcOpened;
+                    mDataChannelPromise.set_value();
                 });
 
             data_channel->onError(
@@ -206,6 +207,7 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
                 {
                     LOG_ERROR_S << "DataChannel failed: " << error << endl;
                     mState.data_channel = DcFailed;
+                    mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
                 });
 
             data_channel->onClosed(
@@ -213,6 +215,7 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
                 {
                     LOG_INFO_S << "DataChannel closed" << std::endl;
                     mState.data_channel = DcClosed;
+                    mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("DataChannel closed")));
                 });
 
             data_channel->onMessage(
@@ -239,16 +242,21 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
                     }
                     _data_out.write(dataPacket);
                 });
+
         });
 }
 
 void Task::configureWebSocket()
 {
+    std::promise<void> ws_promise;
+    auto ws_future = ws_promise.get_future();
+
     mWs->onOpen(
         [&]()
         {
             LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
             mState.web_socket = WsOpened;
+            ws_promise.set_value();
         });
 
     mWs->onError(
@@ -256,6 +264,8 @@ void Task::configureWebSocket()
         {
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
             mState.web_socket = WsFailed;
+            ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
 
     mWs->onClosed(
@@ -263,6 +273,8 @@ void Task::configureWebSocket()
         {
             LOG_INFO_S << "WebSocket closed" << std::endl;
             mState.web_socket = WsClosed;
+            ws_promise.set_exception(std::make_exception_ptr(std::runtime_error("WebSocket closed")));
+            mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error("WebSocket closed")));
         });
 
     mWs->onMessage(
@@ -275,6 +287,19 @@ void Task::configureWebSocket()
 
             parseIncomingMessage(get<string>(data).c_str());
             string actiontype = mDecoder.getActionType();
+
+            if (actiontype == "ping")
+            {
+                pong();
+            }
+            if (actiontype == "pong")
+            {
+                if (_remote_peer_id.get() == mDecoder.getFrom())
+                {
+                    mRemotePeerAnswerReceived = true;
+                    mWaitRemotePeerPromise.set_value();
+                }
+            }
 
             if (actiontype == "offer")
             {
@@ -293,6 +318,35 @@ void Task::configureWebSocket()
     // wss://signalserverhost?user=yourname
     const string url = _signaling_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
+    ws_future.get();
+}
+
+void Task::ping()
+{
+    Json::Value message;
+    message["protocol"] = "one-to-one";
+    message["to"] = _remote_peer_id.get();
+    message["action"] = "ping";
+    message["data"]["from"] = _local_peer_id.get();
+    Json::FastWriter fast;
+    if (auto ws = make_weak_ptr(mWs).lock())
+    {
+        ws->send(fast.write(message));
+    }
+}
+
+void Task::pong()
+{
+    Json::Value message;
+    message["protocol"] = "one-to-one";
+    message["to"] = mDecoder.getFrom();
+    message["action"] = "pong";
+    message["data"]["from"] = _local_peer_id.get();
+    Json::FastWriter fast;
+    if (auto ws = make_weak_ptr(mWs).lock())
+    {
+        ws->send(fast.write(message));
+    }
 }
 
 Task::Task(string const &name) : TaskBase(name) {}
@@ -308,15 +362,9 @@ bool Task::configureHook()
     if (!TaskBase::configureHook())
         return false;
 
+
     mConfig.iceServers.emplace_back(_stun_server.get());
     mWs = std::make_shared<rtc::WebSocket>();
-    mState.web_socket = WsClosed;
-    mState.data_channel = DcClosed;
-    mState.peer_connection.gathering_state = InProgress;
-    mState.peer_connection.local_candidate = NoCandidate;
-    mState.peer_connection.local_description = NoDescription;
-    mState.peer_connection.signaling_state = Stable;
-    mState.peer_connection.state = Closed;
 
     configureWebSocket();
 
@@ -327,13 +375,25 @@ bool Task::startHook()
     if (!TaskBase::startHook())
         return false;
 
+    std::future<void> dc_future = mDataChannelPromise.get_future();
+    std::future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
+
     if (!_remote_peer_id.get().empty())
     {
+        mRemotePeerAnswerReceived = false;
+        while(!mRemotePeerAnswerReceived)
+        {
+            ping();
+            usleep(100);
+        }
+        wait_remote_peer_future.get();
+
         mPeerConnection = initiatePeerConnection(_remote_peer_id.get());
         configurePeerDataChannel(_remote_peer_id.get());
 
         mDataChannel = mPeerConnection->createDataChannel(_data_channel_label.get());
     }
+    dc_future.get();
 
     return true;
 }
