@@ -4,6 +4,7 @@
 
 using namespace iodrivers_base;
 using namespace comms_webrtc;
+using namespace std::this_thread;
 using namespace std;
 using namespace rtc;
 
@@ -152,11 +153,6 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
             {
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
-                mState.peer_connection.local_description = NewDescription;
-            }
-            else
-            {
-                mState.peer_connection.local_description = NoDescription;
             }
         });
 
@@ -175,11 +171,6 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
             {
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
-                mState.peer_connection.local_candidate = NewCandidate;
-            }
-            else
-            {
-                mState.peer_connection.local_candidate = NoCandidate;
             }
         });
 
@@ -384,7 +375,7 @@ bool Task::startHook()
         while(!mRemotePeerAnswerReceived)
         {
             ping();
-            usleep(100);
+            sleep_for(100ms);
         }
         wait_remote_peer_future.get();
 

@@ -32,25 +32,11 @@ namespace comms_webrtc
         HaveRemotePranswer
     };
 
-    enum LocalDescriptionState
-    {
-        NoDescription,
-        NewDescription
-    };
-
-    enum LocalCandidateState
-    {
-        NoCandidate,
-        NewCandidate
-    };
-
     struct PeerConnectionState
     {
         ConnectionState state = NoConnection;
         GatheringState gathering_state = NoGathering;
         SignalingState signaling_state = NoSignaling;
-        LocalDescriptionState local_description = NoDescription;
-        LocalCandidateState local_candidate = NoCandidate;
     };
 
     enum DatachannelState
