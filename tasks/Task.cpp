@@ -14,6 +14,7 @@ weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 void Task::onOffer()
 {
     string description = mDecoder.getDescription();
+    mRemotePeerID = mDecoder.getFrom();
     createPeerConnection();
 
     try
@@ -72,12 +73,11 @@ void Task::parseIncomingMessage(char const *data)
 
 void Task::createPeerConnection()
 {
-    string remote_peer_id = mDecoder.getFrom();
-    mPeerConnection = initiatePeerConnection(remote_peer_id);
-    configurePeerDataChannel(remote_peer_id);
+    mPeerConnection = initiatePeerConnection();
+    configurePeerDataChannel();
 }
 
-shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remote_peer_id)
+shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
 {
     auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
 
@@ -140,11 +140,11 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
         });
 
     peer_connection->onLocalDescription(
-        [&, remote_peer_id](rtc::Description description)
+        [&](rtc::Description description)
         {
             Json::Value message;
             message["protocol"] = "one-to-one";
-            message["to"] = remote_peer_id;
+            message["to"] = mRemotePeerID;
             message["action"] = description.typeString();
             message["data"]["from"] = _local_peer_id.get();
             message["data"]["description"] = string(description);
@@ -157,11 +157,11 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
         });
 
     peer_connection->onLocalCandidate(
-        [&, remote_peer_id](rtc::Candidate candidate)
+        [&](rtc::Candidate candidate)
         {
             Json::Value message;
             message["protocol"] = "one-to-one";
-            message["to"] = remote_peer_id;
+            message["to"] = mRemotePeerID;
             message["action"] = "candidate";
             message["data"]["from"] = _local_peer_id.get();
             message["data"]["candidate"] = string(candidate);
@@ -177,13 +177,14 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection(string const &remot
     return peer_connection;
 }
 
-void Task::configurePeerDataChannel(string const &remote_peer_id)
+void Task::configurePeerDataChannel()
 {
     mPeerConnection->onDataChannel(
         [&](shared_ptr<rtc::DataChannel> data_channel)
         {
+            LOG_ERROR_S << "NEW DATA CHANNEL" << std::endl;
             mDataChannel = data_channel;
-            registerDataChannelCallBacks(data_channel, remote_peer_id);
+            registerDataChannelCallBacks(data_channel);
         });
 }
 
@@ -290,10 +291,10 @@ void Task::pong()
     }
 }
 
-void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel, string const &remote_peer_id)
+void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel)
 {
     data_channel->onOpen(
-        [&, remote_peer_id]()
+        [&]()
         {
             LOG_INFO_S << "DataChannel from " << remote_peer_id
                        << " received with label \"" << data_channel->label() << "\""
@@ -374,6 +375,7 @@ bool Task::startHook()
 
     if (!_remote_peer_id.get().empty())
     {
+        mRemotePeerID = _remote_peer_id.get();
         mRemotePeerAnswerReceived = false;
         while (!mRemotePeerAnswerReceived)
         {
@@ -382,10 +384,10 @@ bool Task::startHook()
         }
         wait_remote_peer_future.get();
 
-        mPeerConnection = initiatePeerConnection(_remote_peer_id.get());
+        mPeerConnection = initiatePeerConnection();
         string label = _data_channel_label.get();
         mDataChannel = mPeerConnection->createDataChannel(label);
-        registerDataChannelCallBacks(mDataChannel, _remote_peer_id);
+        registerDataChannelCallBacks(mDataChannel);
         dc_future.get();
     }
 
