@@ -43,5 +43,10 @@ describe OroGen.comms_webrtc.Task do
             emit task2.start_event
         end
 
+        data = expect_execution do
+            syskit_write task1.data_in_port, { data: [0, 1, 2, 3] }
+        end.to { have_one_new_sample task2.data_out_port }
+
+        pp data
     end
 end
