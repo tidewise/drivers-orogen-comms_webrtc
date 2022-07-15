@@ -106,7 +106,6 @@ namespace comms_webrtc
     void cleanupHook();
 
   private:
-
     double mRemotePeerAnswerReceived;
     rtc::Configuration mConfig;
     comms_webrtc::WebRTCState mState;
@@ -123,6 +122,8 @@ namespace comms_webrtc
     void onCandidate();
     void onOffer();
     void createPeerConnection();
+    void registerDataChannelCallBacks(std::shared_ptr<rtc::DataChannel> data_channel,
+                                      std::string const &remote_peer_id);
     void parseIncomingMessage(char const *data);
     void configurePeerDataChannel(std::string const &remote_peer_id);
     void configureWebSocket();

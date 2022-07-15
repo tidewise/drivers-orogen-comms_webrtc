@@ -23,7 +23,7 @@ task_context "Task" do
     # the riquired peer connection)
     property "remote_peer_id", "std/string"
 
-    # Data channel label
+    # Data channel label (only needed if you intend to send an offer)
     property "data_channel_label", "std/string"
 
     # Websocket server name (e.g. 127.0.0.1:3012)

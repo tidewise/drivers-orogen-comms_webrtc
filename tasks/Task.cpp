@@ -183,57 +183,7 @@ void Task::configurePeerDataChannel(string const &remote_peer_id)
         [&](shared_ptr<rtc::DataChannel> data_channel)
         {
             mDataChannel = data_channel;
-            data_channel->onOpen(
-                [&, remote_peer_id]()
-                {
-                    LOG_INFO_S << "DataChannel from " << remote_peer_id
-                               << " received with label \"" << data_channel->label() << "\""
-                               << std::endl;
-                    mState.data_channel = DcOpened;
-                    mDataChannelPromise.set_value();
-                });
-
-            data_channel->onError(
-                [&](const string &error)
-                {
-                    LOG_ERROR_S << "DataChannel failed: " << error << endl;
-                    mState.data_channel = DcFailed;
-                    mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
-                });
-
-            data_channel->onClosed(
-                [&]()
-                {
-                    LOG_INFO_S << "DataChannel closed" << std::endl;
-                    mState.data_channel = DcClosed;
-                    mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("DataChannel closed")));
-                });
-
-            data_channel->onMessage(
-                [&](variant<binary, string> data)
-                {
-                    RawPacket dataPacket;
-                    dataPacket.time = base::Time::now();
-
-                    if (holds_alternative<string>(data))
-                    {
-                        string data_string = get<string>(data);
-                        vector<uint8_t> new_data(data_string.begin(), data_string.end());
-                        dataPacket.data.resize(new_data.size());
-                        dataPacket.data = new_data;
-                    }
-                    else
-                    {
-                        vector<byte> data_byte = get<binary>(data);
-                        dataPacket.data.resize(data_byte.size());
-                        for (unsigned int i = 0; i < data_byte.size(); i++)
-                        {
-                            dataPacket.data[i] = to_integer<uint8_t>(data_byte[i]);
-                        }
-                    }
-                    _data_out.write(dataPacket);
-                });
-
+            registerDataChannelCallBacks(data_channel, remote_peer_id);
         });
 }
 
@@ -340,6 +290,60 @@ void Task::pong()
     }
 }
 
+void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel, string const &remote_peer_id)
+{
+    data_channel->onOpen(
+        [&, remote_peer_id]()
+        {
+            LOG_INFO_S << "DataChannel from " << remote_peer_id
+                       << " received with label \"" << data_channel->label() << "\""
+                       << std::endl;
+            mState.data_channel = DcOpened;
+            mDataChannelPromise.set_value();
+        });
+
+    data_channel->onError(
+        [&](const string &error)
+        {
+            LOG_ERROR_S << "DataChannel failed: " << error << endl;
+            mState.data_channel = DcFailed;
+            mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+        });
+
+    data_channel->onClosed(
+        [&]()
+        {
+            LOG_INFO_S << "DataChannel closed" << std::endl;
+            mState.data_channel = DcClosed;
+            mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("DataChannel closed")));
+        });
+
+    data_channel->onMessage(
+        [&](variant<binary, string> data)
+        {
+            RawPacket dataPacket;
+            dataPacket.time = base::Time::now();
+
+            if (holds_alternative<string>(data))
+            {
+                string data_string = get<string>(data);
+                vector<uint8_t> new_data(data_string.begin(), data_string.end());
+                dataPacket.data.resize(new_data.size());
+                dataPacket.data = new_data;
+            }
+            else
+            {
+                vector<byte> data_byte = get<binary>(data);
+                dataPacket.data.resize(data_byte.size());
+                for (unsigned int i = 0; i < data_byte.size(); i++)
+                {
+                    dataPacket.data[i] = to_integer<uint8_t>(data_byte[i]);
+                }
+            }
+            _data_out.write(dataPacket);
+        });
+}
+
 Task::Task(string const &name) : TaskBase(name) {}
 
 Task::~Task() {}
@@ -353,7 +357,6 @@ bool Task::configureHook()
     if (!TaskBase::configureHook())
         return false;
 
-
     mConfig.iceServers.emplace_back(_stun_server.get());
     mWs = std::make_shared<rtc::WebSocket>();
 
@@ -366,13 +369,13 @@ bool Task::startHook()
     if (!TaskBase::startHook())
         return false;
 
-    std::future<void> dc_future = mDataChannelPromise.get_future();
     std::future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
+    std::future<void> dc_future = mDataChannelPromise.get_future();
 
     if (!_remote_peer_id.get().empty())
     {
         mRemotePeerAnswerReceived = false;
-        while(!mRemotePeerAnswerReceived)
+        while (!mRemotePeerAnswerReceived)
         {
             ping();
             sleep_for(100ms);
@@ -380,11 +383,11 @@ bool Task::startHook()
         wait_remote_peer_future.get();
 
         mPeerConnection = initiatePeerConnection(_remote_peer_id.get());
-        configurePeerDataChannel(_remote_peer_id.get());
-
-        mDataChannel = mPeerConnection->createDataChannel(_data_channel_label.get());
+        string label = _data_channel_label.get();
+        mDataChannel = mPeerConnection->createDataChannel(label);
+        registerDataChannelCallBacks(mDataChannel, _remote_peer_id);
+        dc_future.get();
     }
-    dc_future.get();
 
     return true;
 }
