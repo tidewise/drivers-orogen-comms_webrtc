@@ -293,12 +293,12 @@ void Task::pong()
 
 void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel)
 {
+    LOG_INFO_S << "DataChannel from " << mRemotePeerID
+               << " received with label \"" << data_channel->label() << "\""
+               << std::endl;
     data_channel->onOpen(
         [&]()
         {
-            LOG_INFO_S << "DataChannel from " << remote_peer_id
-                       << " received with label \"" << data_channel->label() << "\""
-                       << std::endl;
             mState.data_channel = DcOpened;
             mDataChannelPromise.set_value();
         });
