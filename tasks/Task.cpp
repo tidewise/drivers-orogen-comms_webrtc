@@ -388,8 +388,8 @@ bool Task::startHook()
         string label = _data_channel_label.get();
         mDataChannel = mPeerConnection->createDataChannel(label);
         registerDataChannelCallBacks(mDataChannel);
-        dc_future.get();
     }
+    dc_future.get();
 
     return true;
 }
