@@ -31,7 +31,7 @@ describe OroGen.comms_webrtc.Task do
         @task2.properties.signaling_server_name = "127.0.0.1:3012"
     end
 
-    it "configure and starts the tasks" do
+    it "configure, starts and send message between the tasks" do
         syskit_configure(task1)
         syskit_configure(task2)
 
@@ -43,10 +43,34 @@ describe OroGen.comms_webrtc.Task do
             emit task2.start_event
         end
 
+        data_in = Types.iodrivers_base.RawPacket.new
+        data_in.time = Time.now
+        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
+
         data = expect_execution do
-            syskit_write task1.data_in_port, { data: [0, 1, 2, 3] }
+            syskit_write task1.data_in_port, data_in
         end.to { have_one_new_sample task2.data_out_port }
 
-        pp data
+        assert_equal data_in.data, data.data
+
+        state_task = Types.comms_webrtc.WebRTCState.new
+        state_task.peer_connection.state = :NoConnection
+        state_task.peer_connection.gathering_state = :NoGathering
+        state_task.peer_connection.signaling_state = :NoSignaling
+        state_task.data_channel = :DcClosed
+        state_task.web_socket = :WsClosed
+
+        state = expect_execution do
+            task1.stop!
+            task2.stop!
+        end.to do
+            emit task1.stop_event
+            emit task2.stop_event
+            [have_one_new_sample(task1.status_port),
+             have_one_new_sample(task2.status_port)]
+        end
+
+        assert_equal state_task, state[0]
+        assert_equal state_task, state[1]
     end
 end
