@@ -37,8 +37,6 @@ namespace comms_webrtc
         ConnectionState state = NoConnection;
         GatheringState gathering_state = NoGathering;
         SignalingState signaling_state = NoSignaling;
-
-        PeerConnectionState() {}
     };
 
     enum DatachannelState
@@ -56,11 +54,9 @@ namespace comms_webrtc
     };
     struct WebRTCState
     {
-        PeerConnectionState peer_connection = PeerConnectionState();
+        PeerConnectionState peer_connection;
         DatachannelState data_channel = DcClosed;
         WebSocketState web_socket = WsClosed;
-
-        WebRTCState() {}
     };
 }
 
