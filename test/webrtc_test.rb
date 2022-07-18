@@ -9,29 +9,29 @@ describe OroGen.comms_webrtc.Task do
 
     attr_reader :task1, :task2
 
-    before do
-        syskit_stub_conf(OroGen.comms_webrtc.Task, "task1", "task2")
+    def deploy(task_a, task_b)
+        syskit_stub_conf(OroGen.comms_webrtc.Task, task_a.to_s, task_b.to_s)
 
         @task1 = syskit_deploy(
-            OroGen.comms_webrtc.Task.with_conf("task1").deployed_as("task1")
+            OroGen.comms_webrtc.Task.with_conf(task_a.to_s).deployed_as(task_a.to_s)
         )
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"
-        @task1.properties.local_peer_id = "task1"
-        @task1.properties.remote_peer_id = "task2"
+        @task1.properties.local_peer_id = task_a.to_s
+        @task1.properties.remote_peer_id = task_b.to_s
         @task1.properties.data_channel_label = "test_data_label"
         @task1.properties.signaling_server_name = "127.0.0.1:3012"
 
         @task2 = syskit_deploy(
-            OroGen.comms_webrtc.Task.with_conf("task2").deployed_as("task2")
+            OroGen.comms_webrtc.Task.with_conf(task_b.to_s).deployed_as(task_b.to_s)
         )
         @task2.properties.stun_server = "stun:stun.l.google.com:19302"
-        @task2.properties.local_peer_id = "task2"
+        @task2.properties.local_peer_id = task_b.to_s
         @task2.properties.remote_peer_id = ""
         @task2.properties.data_channel_label = "test_data_label"
         @task2.properties.signaling_server_name = "127.0.0.1:3012"
     end
 
-    it "configure, starts and send message between the tasks" do
+    def configure_and_start()
         syskit_configure(task1)
         syskit_configure(task2)
 
@@ -42,6 +42,54 @@ describe OroGen.comms_webrtc.Task do
             emit task1.start_event
             emit task2.start_event
         end
+    end
+
+    it "emits start only after the data channel is fully established" do
+        deploy("task_a", "task_b")
+        configure_and_start
+    end
+
+    it "transmits data from the active to the passive task once started" do
+        deploy("task_a", "task_b")
+        configure_and_start
+
+        data_in = Types.iodrivers_base.RawPacket.new
+        data_in.time = Time.now
+        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
+
+        data = expect_execution do
+            syskit_write task1.data_in_port, data_in
+        end.to { have_one_new_sample task2.data_out_port }
+
+        assert_equal data_in.data, data.data
+    end
+
+    it "transmits data from the passive to the active task once started" do
+        deploy("task_a", "task_b")
+        configure_and_start
+
+        data_in_task1 = Types.iodrivers_base.RawPacket.new
+        data_in_task1.time = Time.now
+        data_in_task1.data = [1, 0, 1, 0, 1, 1, 1, 0]
+
+        expect_execution do
+            syskit_write task1.data_in_port, data_in_task1
+        end.to { have_one_new_sample task2.data_out_port }
+
+        data_in_task2 = Types.iodrivers_base.RawPacket.new
+        data_in_task2.time = Time.now
+        data_in_task2.data = [0, 0, 0, 0, 1, 0, 1, 0]
+
+        output = expect_execution do
+            syskit_write task2.data_in_port, data_in_task2
+        end.to { have_one_new_sample task1.data_out_port }
+
+        assert_equal data_in_task2.data, output.data
+    end
+
+    it "successfully reestablishes connection after a stop/start cycle" do
+        deploy("task_a", "task_b")
+        configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
         data_in.time = Time.now
@@ -72,5 +120,8 @@ describe OroGen.comms_webrtc.Task do
 
         assert_equal state_task, state[0]
         assert_equal state_task, state[1]
+
+        deploy("task_c", "task_d")
+        configure_and_start
     end
 end
