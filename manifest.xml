@@ -9,4 +9,5 @@
   <depend package="jsoncpp"/>
 
   <test_depend package="tools/syskit" />
+  <test_depend package="tools/rustysignal" />
 </package>

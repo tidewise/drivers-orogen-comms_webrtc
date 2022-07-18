@@ -182,7 +182,6 @@ void Task::configurePeerDataChannel()
     mPeerConnection->onDataChannel(
         [&](shared_ptr<rtc::DataChannel> data_channel)
         {
-            LOG_ERROR_S << "NEW DATA CHANNEL" << std::endl;
             mDataChannel = data_channel;
             registerDataChannelCallBacks(data_channel);
         });
