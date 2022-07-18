@@ -113,6 +113,8 @@ namespace comms_webrtc
     comms_webrtc::MessageDecoder mDecoder;
     std::promise<void> mDataChannelPromise;
     std::promise<void> mWaitRemotePeerPromise;
+    std::promise<void> mDataChannelClosePromise;
+    std::promise<void> mPeerConnectionClosePromise;
     std::shared_ptr<rtc::WebSocket> mWs;
     std::shared_ptr<rtc::DataChannel> mDataChannel;
     std::shared_ptr<rtc::PeerConnection> mPeerConnection;

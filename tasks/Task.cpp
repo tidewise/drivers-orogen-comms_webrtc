@@ -89,7 +89,10 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::State::Disconnected:
                 mState.peer_connection.state = Disconnected;
             case rtc::PeerConnection::State::Closed:
+            {
                 mState.peer_connection.state = Closed;
+                mPeerConnectionClosePromise.set_value();
+            }
             case rtc::PeerConnection::State::Connected:
                 mState.peer_connection.state = Connected;
             case rtc::PeerConnection::State::Connecting:
@@ -99,7 +102,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::State::New:
                 mState.peer_connection.state = NewConnection;
             default:
-                break;
+                mState.peer_connection.state = NoConnection;
             }
         });
 
@@ -115,7 +118,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::GatheringState::New:
                 mState.peer_connection.gathering_state = NewGathering;
             default:
-                break;
+                mState.peer_connection.gathering_state = NoGathering;
             }
         });
 
@@ -135,7 +138,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::SignalingState::Stable:
                 mState.peer_connection.signaling_state = Stable;
             default:
-                break;
+                mState.peer_connection.signaling_state = NoSignaling;
             }
         });
 
@@ -207,6 +210,7 @@ void Task::configureWebSocket()
             mState.web_socket = WsFailed;
             ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            mPeerConnectionClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
 
     mWs->onClosed(
@@ -214,8 +218,6 @@ void Task::configureWebSocket()
         {
             LOG_INFO_S << "WebSocket closed" << std::endl;
             mState.web_socket = WsClosed;
-            ws_promise.set_exception(std::make_exception_ptr(std::runtime_error("WebSocket closed")));
-            mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error("WebSocket closed")));
         });
 
     mWs->onMessage(
@@ -308,6 +310,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             LOG_ERROR_S << "DataChannel failed: " << error << endl;
             mState.data_channel = DcFailed;
             mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            mDataChannelClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
 
     data_channel->onClosed(
@@ -315,7 +318,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
         {
             LOG_INFO_S << "DataChannel closed" << std::endl;
             mState.data_channel = DcClosed;
-            mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("DataChannel closed")));
+            mDataChannelClosePromise.set_value();
         });
 
     data_channel->onMessage(
@@ -414,5 +417,23 @@ void Task::updateHook()
     TaskBase::updateHook();
 }
 void Task::errorHook() { TaskBase::errorHook(); }
-void Task::stopHook() { TaskBase::stopHook(); }
+void Task::stopHook()
+{
+    if (mDataChannel->isOpen())
+    {
+        std::future<void> dc_close_future = mDataChannelClosePromise.get_future();
+        mDataChannel->close();
+        dc_close_future.get();
+    }
+    if (mPeerConnection)
+    {
+        std::future<void> pc_close_future = mPeerConnectionClosePromise.get_future();
+        mPeerConnection->close();
+        pc_close_future.get();
+    }
+    mState = WebRTCState();
+    _status.write(mState);
+
+    TaskBase::stopHook();
+}
 void Task::cleanupHook() { TaskBase::cleanupHook(); }
