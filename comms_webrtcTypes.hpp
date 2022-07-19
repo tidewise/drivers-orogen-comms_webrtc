@@ -41,22 +41,24 @@ namespace comms_webrtc
 
     enum DatachannelState
     {
-        DcClosed,
-        DcOpened,
-        DcFailed
+        NoDataChannel,
+        DataChannelClosed,
+        DataChannelOpened,
+        DataChannelFailed
     };
 
     enum WebSocketState
     {
-        WsClosed,
-        WsOpened,
-        WsFailed
+        NoWebSocket,
+        WebSocketClosed,
+        WebSocketOpened,
+        WebSocketFailed
     };
     struct WebRTCState
     {
         PeerConnectionState peer_connection;
-        DatachannelState data_channel = DcClosed;
-        WebSocketState web_socket = WsClosed;
+        DatachannelState data_channel = NoDataChannel;
+        WebSocketState web_socket = NoWebSocket;
     };
 }
 

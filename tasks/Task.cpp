@@ -199,7 +199,7 @@ void Task::configureWebSocket()
         [&]()
         {
             LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
-            mState.web_socket = WsOpened;
+            mState.web_socket = WebSocketOpened;
             ws_promise.set_value();
         });
 
@@ -207,7 +207,7 @@ void Task::configureWebSocket()
         [&](const string &error)
         {
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
-            mState.web_socket = WsFailed;
+            mState.web_socket = WebSocketFailed;
             ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mPeerConnectionClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
@@ -216,7 +216,7 @@ void Task::configureWebSocket()
         [&]()
         {
             LOG_INFO_S << "WebSocket closed" << std::endl;
-            mState.web_socket = WsClosed;
+            mState.web_socket = WebSocketClosed;
         });
 
     mWs->onMessage(
@@ -299,7 +299,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
     data_channel->onOpen(
         [&]()
         {
-            mState.data_channel = DcOpened;
+            mState.data_channel = DataChannelOpened;
             mDataChannelPromise.set_value();
         });
 
@@ -307,7 +307,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
         [&](const string &error)
         {
             LOG_ERROR_S << "DataChannel failed: " << error << endl;
-            mState.data_channel = DcFailed;
+            mState.data_channel = DataChannelFailed;
             mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mDataChannelClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
@@ -316,7 +316,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
         [&]()
         {
             LOG_INFO_S << "DataChannel closed" << std::endl;
-            mState.data_channel = DcClosed;
+            mState.data_channel = DataChannelClosed;
             mDataChannelClosePromise.set_value();
         });
 
@@ -404,7 +404,7 @@ bool Task::startHook()
         std::future<void> dc_future = mDataChannelPromise.get_future();
         base::Time start_time = base::Time::now();
         // Wait for the datachannel open until the timeout
-        while (mState.data_channel != DcOpened)
+        while (mState.data_channel != DataChannelOpened)
         {
             base::Time duration = base::Time::now() - start_time;
             if (duration > _data_channel_open_time_out.get())
