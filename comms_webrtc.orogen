@@ -12,6 +12,12 @@ using_library "jsoncpp", typekit: false
 task_context "Task" do
     needs_configuration
 
+    # Timeout to wait for a remote peer answer
+    property "wait_remote_peer_time_out", "base/Time"
+
+    # Timeout to wait the datachannel open
+    property "data_channel_open_time_out", "base/Time"
+
     # Stun server (e.g stun:stun.l.google.com:19302)
     property "stun_server", "std/string"
 

@@ -9,12 +9,14 @@ describe OroGen.comms_webrtc.Task do
 
     attr_reader :task1, :task2
 
-    def deploy(task_a, task_b)
+    def deploy(task_a, task_b, time_out)
         syskit_stub_conf(OroGen.comms_webrtc.Task, task_a.to_s, task_b.to_s)
 
         @task1 = syskit_deploy(
             OroGen.comms_webrtc.Task.with_conf(task_a.to_s).deployed_as(task_a.to_s)
         )
+        @task1.properties.data_channel_open_time_out = time_out
+        @task1.properties.wait_remote_peer_time_out = time_out
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"
         @task1.properties.local_peer_id = task_a.to_s
         @task1.properties.remote_peer_id = task_b.to_s
@@ -24,6 +26,8 @@ describe OroGen.comms_webrtc.Task do
         @task2 = syskit_deploy(
             OroGen.comms_webrtc.Task.with_conf(task_b.to_s).deployed_as(task_b.to_s)
         )
+        @task2.properties.data_channel_open_time_out = time_out
+        @task2.properties.wait_remote_peer_time_out = time_out
         @task2.properties.stun_server = "stun:stun.l.google.com:19302"
         @task2.properties.local_peer_id = task_b.to_s
         @task2.properties.remote_peer_id = ""
@@ -45,12 +49,12 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "emits start only after the data channel is fully established" do
-        deploy("task_a", "task_b")
+        deploy("task_a", "task_b", Time.at(2))
         configure_and_start
     end
 
     it "transmits data from the active to the passive task once started" do
-        deploy("task_a", "task_b")
+        deploy("task_a", "task_b", Time.at(5))
         configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
@@ -65,7 +69,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "transmits data from the passive to the active task once started" do
-        deploy("task_a", "task_b")
+        deploy("task_a", "task_b", Time.at(5))
         configure_and_start
 
         data_in_task1 = Types.iodrivers_base.RawPacket.new
@@ -88,7 +92,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "successfully reestablishes connection after a stop/start cycle" do
-        deploy("task_a", "task_b")
+        deploy("task_a", "task_b", Time.at(5))
         configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
@@ -121,7 +125,21 @@ describe OroGen.comms_webrtc.Task do
         assert_equal state_task, state[0]
         assert_equal state_task, state[1]
 
-        deploy("task_c", "task_d")
+        deploy("task_c", "task_d", Time.at(5))
         configure_and_start
+    end
+
+    it "returns exception when the wait to find the remote peer id exceeds the timeout" do
+        deploy("task_a", "task_b", Time.at(0))
+        syskit_configure(task1)
+        syskit_configure(task2)
+
+        expect_execution do
+            task1.start!
+            task2.start!
+        end.to do
+            fail_to_start task1
+            fail_to_start task2
+        end
     end
 end

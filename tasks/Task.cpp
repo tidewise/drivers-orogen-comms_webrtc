@@ -209,7 +209,6 @@ void Task::configureWebSocket()
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
             mState.web_socket = WsFailed;
             ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
-            mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mPeerConnectionClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
         });
 
@@ -372,26 +371,50 @@ bool Task::startHook()
     if (!TaskBase::startHook())
         return false;
 
-    std::future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
-    std::future<void> dc_future = mDataChannelPromise.get_future();
-
     if (!_remote_peer_id.get().empty())
     {
+        std::future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
         mRemotePeerID = _remote_peer_id.get();
         mRemotePeerAnswerReceived = false;
+
+        base::Time start_time = base::Time::now();
+        // Get contact with the remote peer and create datachannel
         while (!mRemotePeerAnswerReceived)
         {
+            base::Time duration = base::Time::now() - start_time;
+            if (duration > _wait_remote_peer_time_out.get())
+            {
+                mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error("Timeout to find the remote peer")));
+                break;
+            }
             ping();
             sleep_for(100ms);
         }
         wait_remote_peer_future.get();
 
+        std::future<void> dc_future = mDataChannelPromise.get_future();
         mPeerConnection = initiatePeerConnection();
         string label = _data_channel_label.get();
         mDataChannel = mPeerConnection->createDataChannel(label);
         registerDataChannelCallBacks(mDataChannel);
+        dc_future.get();
     }
-    dc_future.get();
+    else
+    {
+        std::future<void> dc_future = mDataChannelPromise.get_future();
+        base::Time start_time = base::Time::now();
+        // Wait for the datachannel open until the timeout
+        while (mState.data_channel != DcOpened)
+        {
+            base::Time duration = base::Time::now() - start_time;
+            if (duration > _data_channel_open_time_out.get())
+            {
+                mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("Timeout to open datachannel")));
+                break;
+            }
+        }
+        dc_future.get();
+    }
 
     return true;
 }
