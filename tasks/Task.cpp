@@ -397,7 +397,7 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
-    if (mDataChannel && mDataChannel->isOpen())
+    if (mDataChannel->isOpen())
     {
         iodrivers_base::RawPacket raw_packet;
         if (_data_in.read(raw_packet) != RTT::NewData)
