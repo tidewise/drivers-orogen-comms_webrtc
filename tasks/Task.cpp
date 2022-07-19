@@ -428,7 +428,7 @@ void Task::stopHook()
     if (mPeerConnection)
     {
         std::future<void> pc_close_future = mPeerConnectionClosePromise.get_future();
-        mPeerConnection->close();
+        mPeerConnection.reset();
         pc_close_future.get();
     }
     mState = WebRTCState();
