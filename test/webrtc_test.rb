@@ -15,8 +15,10 @@ describe OroGen.comms_webrtc.Task do
         @task1 = syskit_deploy(
             OroGen.comms_webrtc.Task.with_conf(task_a.to_s).deployed_as(task_a.to_s)
         )
-        @task1.properties.data_channel_open_time_out = time_out
+        @task1.properties.data_channel_time_out = time_out
+        @task1.properties.peer_connection_time_out = time_out
         @task1.properties.wait_remote_peer_time_out = time_out
+        @task1.properties.websocket_open_time_out = time_out
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"
         @task1.properties.local_peer_id = task_a.to_s
         @task1.properties.remote_peer_id = task_b.to_s
@@ -26,8 +28,10 @@ describe OroGen.comms_webrtc.Task do
         @task2 = syskit_deploy(
             OroGen.comms_webrtc.Task.with_conf(task_b.to_s).deployed_as(task_b.to_s)
         )
-        @task2.properties.data_channel_open_time_out = time_out
+        @task2.properties.data_channel_time_out = time_out
+        @task2.properties.peer_connection_time_out = time_out
         @task2.properties.wait_remote_peer_time_out = time_out
+        @task2.properties.websocket_open_time_out = time_out
         @task2.properties.stun_server = "stun:stun.l.google.com:19302"
         @task2.properties.local_peer_id = task_b.to_s
         @task2.properties.remote_peer_id = ""
@@ -71,14 +75,6 @@ describe OroGen.comms_webrtc.Task do
     it "transmits data from the passive to the active task once started" do
         deploy("task_a", "task_b", Time.at(5))
         configure_and_start
-
-        data_in_task1 = Types.iodrivers_base.RawPacket.new
-        data_in_task1.time = Time.now
-        data_in_task1.data = [1, 0, 1, 0, 1, 1, 1, 0]
-
-        expect_execution do
-            syskit_write task1.data_in_port, data_in_task1
-        end.to { have_one_new_sample task2.data_out_port }
 
         data_in_task2 = Types.iodrivers_base.RawPacket.new
         data_in_task2.time = Time.now
@@ -127,35 +123,28 @@ describe OroGen.comms_webrtc.Task do
 
         deploy("task_c", "task_d", Time.at(5))
         configure_and_start
+
+        output = expect_execution do
+            syskit_write task2.data_in_port, data_in
+        end.to { have_one_new_sample task1.data_out_port }
+
+        assert_equal data_in.data, output.data
     end
 
     it "returns exception when the wait to find the remote peer id exceeds the timeout" do
-        deploy("task_a", "task_b", Time.at(0))
+        deploy("task_a", "task_b", Time.at(2))
         syskit_configure(task1)
-        syskit_configure(task2)
 
         expect_execution do
             task1.start!
-            task2.start!
         end.to do
             fail_to_start task1
-            fail_to_start task2
         end
     end
 
     it "detects that the channel has been closed from the active side" do
         deploy("task_a", "task_b", Time.at(2))
         configure_and_start
-
-        data_in = Types.iodrivers_base.RawPacket.new
-        data_in.time = Time.now
-        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
-
-        data = expect_execution do
-            syskit_write task1.data_in_port, data_in
-        end.to { have_one_new_sample task2.data_out_port }
-
-        assert_equal data_in.data, data.data
 
         expect_execution do
             task1.stop!
@@ -168,16 +157,6 @@ describe OroGen.comms_webrtc.Task do
     it "detects that the channel has been closed from the passive side" do
         deploy("task_a", "task_b", Time.at(2))
         configure_and_start
-
-        data_in = Types.iodrivers_base.RawPacket.new
-        data_in.time = Time.now
-        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
-
-        data = expect_execution do
-            syskit_write task1.data_in_port, data_in
-        end.to { have_one_new_sample task2.data_out_port }
-
-        assert_equal data_in.data, data.data
 
         expect_execution do
             task2.stop!

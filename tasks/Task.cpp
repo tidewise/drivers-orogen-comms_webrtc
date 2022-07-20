@@ -21,11 +21,11 @@ void Task::onOffer()
     {
         mPeerConnection->setRemoteDescription(rtc::Description(description, "offer"));
     }
-    catch (const std::logic_error &error)
+    catch (const logic_error &error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
-        LOG_ERROR_S << std::endl;
+        LOG_ERROR_S << endl;
     }
 }
 
@@ -37,11 +37,11 @@ void Task::onAnswer()
     {
         mPeerConnection->setRemoteDescription(rtc::Description(description, "answer"));
     }
-    catch (const std::logic_error &error)
+    catch (const logic_error &error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
-        LOG_ERROR_S << std::endl;
+        LOG_ERROR_S << endl;
     }
 }
 
@@ -58,7 +58,7 @@ void Task::onCandidate()
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
-        LOG_ERROR_S << std::endl;
+        LOG_ERROR_S << endl;
     }
 }
 
@@ -67,7 +67,7 @@ void Task::parseIncomingMessage(char const *data)
     string error;
     if (!mDecoder.parseJSONMessage(data, error))
     {
-        throw std::invalid_argument(error);
+        throw invalid_argument(error);
     }
 }
 
@@ -79,7 +79,7 @@ void Task::createPeerConnection()
 
 shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
 {
-    auto peer_connection = std::make_shared<rtc::PeerConnection>(mConfig);
+    auto peer_connection = make_shared<rtc::PeerConnection>(mConfig);
 
     peer_connection->onStateChange(
         [&](rtc::PeerConnection::State state)
@@ -192,13 +192,13 @@ void Task::configurePeerDataChannel()
 
 void Task::configureWebSocket()
 {
-    std::promise<void> ws_promise;
-    auto ws_future = ws_promise.get_future();
+    promise<void> ws_promise;
+    future<void> ws_future = ws_promise.get_future();
 
     mWs->onOpen(
         [&]()
         {
-            LOG_INFO_S << "WebSocket connected, signaling ready" << std::endl;
+            LOG_INFO_S << "WebSocket connected, signaling ready" << endl;
             mState.web_socket = WebSocketOpened;
             ws_promise.set_value();
         });
@@ -208,15 +208,15 @@ void Task::configureWebSocket()
         {
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
             mState.web_socket = WebSocketFailed;
-            ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
-            mPeerConnectionClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            ws_promise.set_exception(make_exception_ptr(runtime_error(error)));
+            mPeerConnectionClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
             trigger();
         });
 
     mWs->onClosed(
         [&]()
         {
-            LOG_INFO_S << "WebSocket closed" << std::endl;
+            LOG_INFO_S << "WebSocket closed" << endl;
             mState.web_socket = WebSocketClosed;
             trigger();
         });
@@ -262,7 +262,18 @@ void Task::configureWebSocket()
     // wss://signalserverhost?user=yourname
     const string url = _signaling_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
-    ws_future.get();
+    future_status status =
+        ws_future.wait_until(chrono::system_clock::now() +
+                             chrono::seconds(static_cast<int>(_websocket_open_time_out.get().toSeconds())));
+    if(status == future_status::ready)
+    {
+        ws_future.get();
+    }
+    else
+    {
+        mWs.reset();
+        throw runtime_error("WebSocket open failed");
+    }
 }
 
 void Task::ping()
@@ -297,7 +308,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
 {
     LOG_INFO_S << "DataChannel from " << mRemotePeerID
                << " received with label \"" << data_channel->label() << "\""
-               << std::endl;
+               << endl;
     data_channel->onOpen(
         [&]()
         {
@@ -310,15 +321,15 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
         {
             LOG_ERROR_S << "DataChannel failed: " << error << endl;
             mState.data_channel = DataChannelFailed;
-            mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
-            mDataChannelClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            mDataChannelPromise.set_exception(make_exception_ptr(runtime_error(error)));
+            mDataChannelClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
             trigger();
         });
 
     data_channel->onClosed(
         [&]()
         {
-            LOG_INFO_S << "DataChannel closed" << std::endl;
+            LOG_INFO_S << "DataChannel closed" << endl;
             mState.data_channel = DataChannelClosed;
             mDataChannelClosePromise.set_value();
             trigger();
@@ -370,9 +381,9 @@ void Task::evaluateDataChannel()
         break;
     }
     case DataChannelClosed:
-        throw std::runtime_error("DataChannel closed");
+        throw runtime_error("DataChannel closed");
     case DataChannelFailed:
-        throw std::runtime_error("DataChannel failed");
+        throw runtime_error("DataChannel failed");
     default:
         break;
     }
@@ -383,9 +394,9 @@ void Task::evaluateWebSocket()
     switch (mState.web_socket)
     {
     case WebSocketClosed:
-        throw std::runtime_error("WebSocket closed");
+        throw runtime_error("WebSocket closed");
     case WebSocketFailed:
-        throw std::runtime_error("WebSocket failed");
+        throw runtime_error("WebSocket failed");
     default:
         break;
     }
@@ -405,7 +416,7 @@ bool Task::configureHook()
         return false;
 
     mConfig.iceServers.emplace_back(_stun_server.get());
-    mWs = std::make_shared<rtc::WebSocket>();
+    mWs = make_shared<rtc::WebSocket>();
 
     configureWebSocket();
 
@@ -418,19 +429,19 @@ bool Task::startHook()
 
     if (!_remote_peer_id.get().empty())
     {
-        std::future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
         mRemotePeerID = _remote_peer_id.get();
-        mRemotePeerAnswerReceived = false;
+        future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
 
+        // Try to get contact with the remote peer and create datachannel
+        mRemotePeerAnswerReceived = false;
         base::Time start_time = base::Time::now();
-        // Get contact with the remote peer and create datachannel
         while (!mRemotePeerAnswerReceived)
         {
             base::Time duration = base::Time::now() - start_time;
             if (duration > _wait_remote_peer_time_out.get())
             {
                 mWaitRemotePeerPromise.set_exception(
-                    std::make_exception_ptr(std::runtime_error("Timeout to find the remote peer")));
+                    make_exception_ptr(runtime_error("Timeout to find the remote peer")));
                 break;
             }
             ping();
@@ -438,25 +449,24 @@ bool Task::startHook()
         }
         wait_remote_peer_future.get();
 
-        std::future<void> dc_future = mDataChannelPromise.get_future();
+        future<void> dc_future = mDataChannelPromise.get_future();
         mPeerConnection = initiatePeerConnection();
-        string label = _data_channel_label.get();
-        mDataChannel = mPeerConnection->createDataChannel(label);
+        mDataChannel = mPeerConnection->createDataChannel(_data_channel_label.get());
         registerDataChannelCallBacks(mDataChannel);
         dc_future.get();
     }
     else
     {
-        std::future<void> dc_future = mDataChannelPromise.get_future();
+        future<void> dc_future = mDataChannelPromise.get_future();
         base::Time start_time = base::Time::now();
         // Wait for the datachannel open until the timeout
         while (mState.data_channel != DataChannelOpened)
         {
             base::Time duration = base::Time::now() - start_time;
-            if (duration > _data_channel_open_time_out.get())
+            if (duration > _data_channel_time_out.get())
             {
                 mDataChannelPromise.set_exception(
-                    std::make_exception_ptr(std::runtime_error("Timeout to open datachannel")));
+                    make_exception_ptr(runtime_error("Timeout to open datachannel")));
                 break;
             }
         }
@@ -477,17 +487,41 @@ void Task::updateHook()
 void Task::errorHook() { TaskBase::errorHook(); }
 void Task::stopHook()
 {
-    if (mDataChannel->isOpen())
+    if (mDataChannel)
     {
-        std::future<void> dc_close_future = mDataChannelClosePromise.get_future();
-        mDataChannel->close();
-        dc_close_future.get();
+        future<void> dc_close_future = mDataChannelClosePromise.get_future();
+        // Try to close datachannel
+        mDataChannel.reset();
+        // check timeout
+        future_status status =
+            dc_close_future.wait_until(chrono::system_clock::now() +
+                                       chrono::seconds(static_cast<int>(_data_channel_time_out.get().toSeconds())));
+        if(status == future_status::ready)
+        {
+            dc_close_future.get();
+        }
+        else
+        {
+            throw runtime_error("DataChannel close failed");
+        }
     }
     if (mPeerConnection)
     {
-        std::future<void> pc_close_future = mPeerConnectionClosePromise.get_future();
+        future<void> pc_close_future = mPeerConnectionClosePromise.get_future();
+        // Try to close peerconnection
         mPeerConnection.reset();
-        pc_close_future.get();
+        // check timeout
+        future_status status =
+            pc_close_future.wait_until(chrono::system_clock::now() +
+                                       chrono::seconds(static_cast<int>(_peer_connection_time_out.get().toSeconds())));
+        if(status == future_status::ready)
+        {
+            pc_close_future.get();
+        }
+        else
+        {
+            throw runtime_error("Peer connection close failed");
+        }
     }
     mState = WebRTCState();
     _status.write(mState);

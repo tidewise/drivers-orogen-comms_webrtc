@@ -15,8 +15,14 @@ task_context "Task" do
     # Timeout to wait for a remote peer answer
     property "wait_remote_peer_time_out", "base/Time"
 
-    # Timeout to wait the datachannel open
-    property "data_channel_open_time_out", "base/Time"
+    # Timeout to wait for the websocket open
+    property "websocket_open_time_out", "base/Time"
+
+    # Timeout to wait for the peerconnection open/close
+    property "peer_connection_time_out", "base/Time"
+
+    # Timeout to wait the datachannel open/close
+    property "data_channel_time_out", "base/Time"
 
     # Stun server (e.g stun:stun.l.google.com:19302)
     property "stun_server", "std/string"
