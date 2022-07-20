@@ -310,6 +310,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             mState.data_channel = DataChannelFailed;
             mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mDataChannelClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+             trigger();
         });
 
     data_channel->onClosed(
@@ -345,6 +346,34 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             }
             _data_out.write(dataPacket);
         });
+}
+
+void Task::evaluateDataChannel()
+{
+    switch (mState.data_channel)
+    {
+    case DataChannelOpened:
+    {
+        iodrivers_base::RawPacket raw_packet;
+        if (_data_in.read(raw_packet) != RTT::NewData)
+            return;
+
+        vector<byte> data;
+        data.resize(raw_packet.data.size());
+        for (unsigned int i = 0; i < raw_packet.data.size(); i++)
+        {
+            data[i] = static_cast<byte>(raw_packet.data[i]);
+        }
+        mDataChannel->send(&data.front(), data.size());
+        break;
+    }
+    case DataChannelClosed:
+        throw std::runtime_error("DataChannel closed");
+    case DataChannelFailed:
+        throw std::runtime_error("DataChannel failed");
+    default:
+        break;
+    }
 }
 
 Task::Task(string const &name) : TaskBase(name) {}
@@ -421,26 +450,9 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
-    if (mState.data_channel == DataChannelOpened)
-    {
-        iodrivers_base::RawPacket raw_packet;
-        if (_data_in.read(raw_packet) != RTT::NewData)
-            return;
-
-        vector<byte> data;
-        data.resize(raw_packet.data.size());
-        for (unsigned int i = 0; i < raw_packet.data.size(); i++)
-        {
-            data[i] = static_cast<byte>(raw_packet.data[i]);
-        }
-        mDataChannel->send(&data.front(), data.size());
-    }
-    else if (mState.data_channel == DataChannelClosed)
-    {
-        throw std::runtime_error("DataChannel closed");
-    }
-
     _status.write(mState);
+
+    evaluateDataChannel();
 
     TaskBase::updateHook();
 }

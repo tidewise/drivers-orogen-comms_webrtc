@@ -125,6 +125,7 @@ namespace comms_webrtc
     void onCandidate();
     void onOffer();
     void createPeerConnection();
+    void evaluateDataChannel();
     void registerDataChannelCallBacks(std::shared_ptr<rtc::DataChannel> data_channel);
     void parseIncomingMessage(char const *data);
     void configurePeerDataChannel();
