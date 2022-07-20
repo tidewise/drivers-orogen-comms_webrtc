@@ -210,6 +210,7 @@ void Task::configureWebSocket()
             mState.web_socket = WebSocketFailed;
             ws_promise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mPeerConnectionClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
+            trigger();
         });
 
     mWs->onClosed(
@@ -217,6 +218,7 @@ void Task::configureWebSocket()
         {
             LOG_INFO_S << "WebSocket closed" << std::endl;
             mState.web_socket = WebSocketClosed;
+            trigger();
         });
 
     mWs->onMessage(
@@ -310,7 +312,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             mState.data_channel = DataChannelFailed;
             mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
             mDataChannelClosePromise.set_exception(std::make_exception_ptr(std::runtime_error(error)));
-             trigger();
+            trigger();
         });
 
     data_channel->onClosed(
@@ -376,6 +378,19 @@ void Task::evaluateDataChannel()
     }
 }
 
+void Task::evaluateWebSocket()
+{
+    switch (mState.web_socket)
+    {
+    case WebSocketClosed:
+        throw std::runtime_error("WebSocket closed");
+    case WebSocketFailed:
+        throw std::runtime_error("WebSocket failed");
+    default:
+        break;
+    }
+}
+
 Task::Task(string const &name) : TaskBase(name) {}
 
 Task::~Task() {}
@@ -414,7 +429,8 @@ bool Task::startHook()
             base::Time duration = base::Time::now() - start_time;
             if (duration > _wait_remote_peer_time_out.get())
             {
-                mWaitRemotePeerPromise.set_exception(std::make_exception_ptr(std::runtime_error("Timeout to find the remote peer")));
+                mWaitRemotePeerPromise.set_exception(
+                    std::make_exception_ptr(std::runtime_error("Timeout to find the remote peer")));
                 break;
             }
             ping();
@@ -439,7 +455,8 @@ bool Task::startHook()
             base::Time duration = base::Time::now() - start_time;
             if (duration > _data_channel_open_time_out.get())
             {
-                mDataChannelPromise.set_exception(std::make_exception_ptr(std::runtime_error("Timeout to open datachannel")));
+                mDataChannelPromise.set_exception(
+                    std::make_exception_ptr(std::runtime_error("Timeout to open datachannel")));
                 break;
             }
         }
@@ -453,6 +470,7 @@ void Task::updateHook()
     _status.write(mState);
 
     evaluateDataChannel();
+    evaluateWebSocket();
 
     TaskBase::updateHook();
 }
