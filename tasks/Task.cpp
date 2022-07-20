@@ -318,6 +318,7 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             LOG_INFO_S << "DataChannel closed" << std::endl;
             mState.data_channel = DataChannelClosed;
             mDataChannelClosePromise.set_value();
+            trigger();
         });
 
     data_channel->onMessage(
@@ -420,7 +421,7 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
-    if (mDataChannel->isOpen())
+    if (mState.data_channel == DataChannelOpened)
     {
         iodrivers_base::RawPacket raw_packet;
         if (_data_in.read(raw_packet) != RTT::NewData)
@@ -433,6 +434,10 @@ void Task::updateHook()
             data[i] = static_cast<byte>(raw_packet.data[i]);
         }
         mDataChannel->send(&data.front(), data.size());
+    }
+    else if (mState.data_channel == DataChannelClosed)
+    {
+        throw std::runtime_error("DataChannel closed");
     }
 
     _status.write(mState);

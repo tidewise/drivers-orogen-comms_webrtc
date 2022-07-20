@@ -109,8 +109,8 @@ describe OroGen.comms_webrtc.Task do
         state_task.peer_connection.state = :NoConnection
         state_task.peer_connection.gathering_state = :NoGathering
         state_task.peer_connection.signaling_state = :NoSignaling
-        state_task.data_channel = :DcClosed
-        state_task.web_socket = :WsClosed
+        state_task.data_channel = :NoDataChannel
+        state_task.web_socket = :NoWebSocket
 
         state = expect_execution do
             task1.stop!
@@ -140,6 +140,50 @@ describe OroGen.comms_webrtc.Task do
         end.to do
             fail_to_start task1
             fail_to_start task2
+        end
+    end
+
+    it "detects that the channel has been closed from the active side" do
+        deploy("task_a", "task_b", Time.at(2))
+        configure_and_start
+
+        data_in = Types.iodrivers_base.RawPacket.new
+        data_in.time = Time.now
+        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
+
+        data = expect_execution do
+            syskit_write task1.data_in_port, data_in
+        end.to { have_one_new_sample task2.data_out_port }
+
+        assert_equal data_in.data, data.data
+
+        expect_execution do
+            task1.stop!
+        end.to do
+            emit task1.stop_event
+            emit task2.exception_event
+        end
+    end
+
+    it "detects that the channel has been closed from the passive side" do
+        deploy("task_a", "task_b", Time.at(2))
+        configure_and_start
+
+        data_in = Types.iodrivers_base.RawPacket.new
+        data_in.time = Time.now
+        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
+
+        data = expect_execution do
+            syskit_write task1.data_in_port, data_in
+        end.to { have_one_new_sample task2.data_out_port }
+
+        assert_equal data_in.data, data.data
+
+        expect_execution do
+            task2.stop!
+        end.to do
+            emit task2.stop_event
+            emit task1.exception_event
         end
     end
 end
