@@ -9,7 +9,7 @@ describe OroGen.comms_webrtc.Task do
 
     attr_reader :task1, :task2
 
-    def deploy(task_a, task_b, time_out)
+    def deploy(task_a, task_b, time_out, server_name)
         syskit_stub_conf(OroGen.comms_webrtc.Task, task_a.to_s, task_b.to_s)
 
         @task1 = syskit_deploy(
@@ -23,7 +23,7 @@ describe OroGen.comms_webrtc.Task do
         @task1.properties.local_peer_id = task_a.to_s
         @task1.properties.remote_peer_id = task_b.to_s
         @task1.properties.data_channel_label = "test_data_label"
-        @task1.properties.signaling_server_name = "127.0.0.1:3012"
+        @task1.properties.signaling_server_name = server_name
 
         @task2 = syskit_deploy(
             OroGen.comms_webrtc.Task.with_conf(task_b.to_s).deployed_as(task_b.to_s)
@@ -36,7 +36,7 @@ describe OroGen.comms_webrtc.Task do
         @task2.properties.local_peer_id = task_b.to_s
         @task2.properties.remote_peer_id = ""
         @task2.properties.data_channel_label = "test_data_label"
-        @task2.properties.signaling_server_name = "127.0.0.1:3012"
+        @task2.properties.signaling_server_name = server_name
     end
 
     def configure_and_start()
@@ -53,12 +53,12 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "emits start only after the data channel is fully established" do
-        deploy("task_a", "task_b", Time.at(2))
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
     end
 
     it "transmits data from the active to the passive task once started" do
-        deploy("task_a", "task_b", Time.at(5))
+        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
         configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
@@ -73,7 +73,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "transmits data from the passive to the active task once started" do
-        deploy("task_a", "task_b", Time.at(5))
+        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
         configure_and_start
 
         data_in_task2 = Types.iodrivers_base.RawPacket.new
@@ -88,7 +88,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "successfully reestablishes connection after a stop/start cycle" do
-        deploy("task_a", "task_b", Time.at(5))
+        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
         configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
@@ -121,7 +121,7 @@ describe OroGen.comms_webrtc.Task do
         assert_equal state_task, state[0]
         assert_equal state_task, state[1]
 
-        deploy("task_c", "task_d", Time.at(5))
+        deploy("task_c", "task_d", Time.at(5), "127.0.0.1:3012")
         configure_and_start
 
         output = expect_execution do
@@ -132,7 +132,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "returns exception when the wait to find the remote peer id exceeds the timeout" do
-        deploy("task_a", "task_b", Time.at(2))
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         syskit_configure(task1)
 
         expect_execution do
@@ -143,7 +143,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "detects that the channel has been closed from the active side" do
-        deploy("task_a", "task_b", Time.at(2))
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         expect_execution do
@@ -155,7 +155,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "detects that the channel has been closed from the passive side" do
-        deploy("task_a", "task_b", Time.at(2))
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         expect_execution do
@@ -163,6 +163,18 @@ describe OroGen.comms_webrtc.Task do
         end.to do
             emit task2.stop_event
             emit task1.exception_event
+        end
+    end
+
+    it "returns timeout exception when the websocket is not initialized" do
+        deploy("task_a", "task_b", Time.at(2), "240.24.15.234")
+
+        expect_execution do
+            task1.start!
+            task2.start!
+        end.to do
+            fail_to_start task1
+            fail_to_start task2
         end
     end
 end
