@@ -9,6 +9,28 @@ describe OroGen.comms_webrtc.Task do
 
     attr_reader :task1, :task2
 
+    run_pid = nil
+    before do
+        time = Time.now
+        timeout = Time.now + 1
+        while time < timeout
+            begin
+                run_pid = Process.spawn("rustysignal", "127.0.0.1:3012")
+                break
+            rescue Errno::ECONNREFUSED
+                sleep(0.01)
+            end
+            time = Time.now
+        end
+    end
+
+    after do
+        unless run_pid.nil?
+            Process.kill("KILL", run_pid)
+            Process.wait
+        end
+    end
+
     def deploy(task_a, task_b, time_out, server_name)
         syskit_stub_conf(OroGen.comms_webrtc.Task, task_a.to_s, task_b.to_s)
 
