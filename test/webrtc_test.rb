@@ -7,27 +7,27 @@ import_types_from "base"
 describe OroGen.comms_webrtc.Task do
     run_live
 
-    attr_reader :task1, :task2
+    attr_reader :task1, :task2, :rustysignal_pid
 
-    run_pid = nil
     before do
-        time = Time.now
         timeout = Time.now + 1
-        while time < timeout
+        while Time.now < timeout
             begin
-                run_pid = Process.spawn("rustysignal", "127.0.0.1:3012")
+                @rustysignal_pid = Process.spawn("rustysignal", "127.0.0.1:3012")
                 break
             rescue Errno::ECONNREFUSED
                 sleep(0.01)
             end
-            time = Time.now
+        end
+        if @rustysignal_pid.nil?
+            raise "Timeout to start rustysignal"
         end
     end
 
     after do
-        unless run_pid.nil?
-            Process.kill("KILL", run_pid)
-            Process.wait
+        unless @rustysignal_pid.nil?
+            Process.kill("KILL", @rustysignal_pid)
+            Process.waitpid @rustysignal_pid
         end
     end
 
@@ -65,18 +65,28 @@ describe OroGen.comms_webrtc.Task do
         syskit_configure(task1)
         syskit_configure(task2)
 
-        expect_execution do
+        output = expect_execution do
             task1.start!
             task2.start!
         end.to do
             emit task1.start_event
             emit task2.start_event
+            [have_one_new_sample(task1.status_port),
+             have_one_new_sample(task2.status_port)]
         end
+        output
     end
 
     it "emits start only after the data channel is fully established" do
         deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
-        configure_and_start
+        output = configure_and_start
+
+        assert_equal :DataChannelOpened, output[0].data_channel
+        assert_equal :DataChannelOpened, output[1].data_channel
+        assert_equal :WebSocketOpened, output[0].web_socket
+        assert_equal :WebSocketOpened, output[1].web_socket
+        assert_equal :NewGathering, output[0].peer_connection.gathering_state
+        assert_equal :NewGathering, output[1].peer_connection.gathering_state
     end
 
     it "transmits data from the active to the passive task once started" do
@@ -113,15 +123,21 @@ describe OroGen.comms_webrtc.Task do
         deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
         configure_and_start
 
-        data_in = Types.iodrivers_base.RawPacket.new
-        data_in.time = Time.now
-        data_in.data = [1, 0, 1, 0, 1, 1, 1, 0]
+        expect_execution do
+            task1.stop!
+            task2.stop!
+        end.to do
+            emit task1.stop_event
+            emit task2.stop_event
+        end
 
-        data = expect_execution do
-            syskit_write task1.data_in_port, data_in
-        end.to { have_one_new_sample task2.data_out_port }
+        deploy("task_c", "task_d", Time.at(5), "127.0.0.1:3012")
+        configure_and_start
+    end
 
-        assert_equal data_in.data, data.data
+    it "disconnects the WebRTC connection on stop" do
+        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
+        configure_and_start
 
         state_task = Types.comms_webrtc.WebRTCState.new
         state_task.peer_connection.state = :NoConnection
@@ -142,53 +158,71 @@ describe OroGen.comms_webrtc.Task do
 
         assert_equal state_task, state[0]
         assert_equal state_task, state[1]
-
-        deploy("task_c", "task_d", Time.at(5), "127.0.0.1:3012")
-        configure_and_start
-
-        output = expect_execution do
-            syskit_write task2.data_in_port, data_in
-        end.to { have_one_new_sample task1.data_out_port }
-
-        assert_equal data_in.data, output.data
     end
 
     it "returns exception when the wait to find the remote peer id exceeds the timeout" do
         deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         syskit_configure(task1)
 
-        expect_execution do
+        output = expect_execution do
             task1.start!
         end.to do
             fail_to_start task1
+            have_one_new_sample(task1.status_port)
         end
+
+        assert_equal :NoDataChannel, output.data_channel
+    end
+
+    it "returns exception when the wait for the datachannel exceeds the timeout" do
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
+        syskit_configure(task2)
+
+        output = expect_execution do
+            task2.start!
+        end.to do
+            fail_to_start task2
+            have_one_new_sample(task2.status_port)
+        end
+
+        assert_equal :NoDataChannel, output.data_channel
     end
 
     it "detects that the channel has been closed from the active side" do
         deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
-        expect_execution do
+        output = expect_execution do
             task1.stop!
         end.to do
             emit task1.stop_event
             emit task2.exception_event
+            [have_one_new_sample(task1.status_port),
+             have_one_new_sample(task2.status_port)]
         end
+
+        assert_equal :NoDataChannel, output[0].data_channel
+        assert_equal :DataChannelClosed, output[1].data_channel
     end
 
     it "detects that the channel has been closed from the passive side" do
         deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
-        expect_execution do
+        output = expect_execution do
             task2.stop!
         end.to do
             emit task2.stop_event
             emit task1.exception_event
+            [have_one_new_sample(task2.status_port),
+             have_one_new_sample(task1.status_port)]
         end
+
+        assert_equal :NoDataChannel, output[0].data_channel
+        assert_equal :DataChannelClosed, output[1].data_channel
     end
 
-    it "returns timeout exception when the websocket is not initialized" do
+    it "returns timeout exception when the websocket connection times out" do
         deploy("task_a", "task_b", Time.at(2), "240.24.15.234")
 
         expect_execution do
