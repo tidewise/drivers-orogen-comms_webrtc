@@ -267,8 +267,7 @@ void Task::configureWebSocket()
     const string url = _signaling_server_name.get() + "?user=" + _local_peer_id.get();
     mWs->open(url);
     future_status status =
-        ws_future.wait_until(chrono::system_clock::now() +
-                             chrono::seconds(static_cast<int>(_websocket_open_time_out.get().toSeconds())));
+        ws_future.wait_for(chrono::microseconds(_wait_remote_peer_time_out.get().toMicroseconds()));
     if (status == future_status::ready)
     {
         ws_future.get();
@@ -434,22 +433,23 @@ bool Task::startHook()
     if (!_remote_peer_id.get().empty())
     {
         mRemotePeerID = _remote_peer_id.get();
-        mRemotePeerAnswerReceived = false;
         future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
         // Try to get contact with the remote peer and create datachannel
-        ping();
-        future_status status =
-            wait_remote_peer_future.wait_until(chrono::system_clock::now() +
-                                               chrono::seconds(static_cast<int>(_wait_remote_peer_time_out.get().toSeconds())));
-        if (status == future_status::ready)
+        base::Time deadline = base::Time::now() + _wait_remote_peer_time_out.get();
+        while (true)
         {
-            wait_remote_peer_future.get();
+            ping();
+            if (wait_remote_peer_future.wait_for(100ms) == future_status::ready)
+            {
+                wait_remote_peer_future.get();
+                break;
+            }
+            else if (base::Time::now() > deadline)
+            {
+                throw runtime_error("Timeout to get contact with the remote peer");
+            }
         }
-        else
-        {
-            throw runtime_error("Timeout to get contact with the remote peer");
-        }
-
+        // Create datachannel
         mPeerConnection = initiatePeerConnection();
         mDataChannel = mPeerConnection->createDataChannel(_data_channel_label.get());
         registerDataChannelCallBacks(mDataChannel);
@@ -457,8 +457,7 @@ bool Task::startHook()
     future<void> dc_future = mDataChannelPromise.get_future();
     // check datachannel timeout
     future_status status =
-        dc_future.wait_until(chrono::system_clock::now() +
-                             chrono::seconds(static_cast<int>(_data_channel_time_out.get().toSeconds())));
+        dc_future.wait_for(chrono::microseconds(_data_channel_time_out.get().toMicroseconds()));
     if (status == future_status::ready)
     {
         dc_future.get();
@@ -489,8 +488,7 @@ void Task::stopHook()
         mDataChannel.reset();
         // check timeout
         future_status status =
-            dc_close_future.wait_until(chrono::system_clock::now() +
-                                       chrono::seconds(static_cast<int>(_data_channel_time_out.get().toSeconds())));
+            dc_close_future.wait_for(chrono::microseconds(_data_channel_time_out.get().toMicroseconds()));
         if (status == future_status::ready)
         {
             dc_close_future.get();
@@ -507,8 +505,7 @@ void Task::stopHook()
         mPeerConnection.reset();
         // check timeout
         future_status status =
-            pc_close_future.wait_until(chrono::system_clock::now() +
-                                       chrono::seconds(static_cast<int>(_peer_connection_time_out.get().toSeconds())));
+            pc_close_future.wait_for(chrono::microseconds(_peer_connection_time_out.get().toMicroseconds()));
         if (status == future_status::ready)
         {
             pc_close_future.get();
