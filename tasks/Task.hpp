@@ -107,7 +107,6 @@ namespace comms_webrtc
 
   private:
     std::string mRemotePeerID;
-    double mRemotePeerAnswerReceived;
     rtc::Configuration mConfig;
     comms_webrtc::WebRTCState mState;
     comms_webrtc::MessageDecoder mDecoder;
