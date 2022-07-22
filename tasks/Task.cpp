@@ -102,7 +102,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::State::New:
                 mState.peer_connection.state = NewConnection;
             default:
-                mState.peer_connection.state = NoConnection;
+                break;
             }
         });
 
@@ -118,7 +118,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::GatheringState::New:
                 mState.peer_connection.gathering_state = NewGathering;
             default:
-                mState.peer_connection.gathering_state = NoGathering;
+                break;
             }
         });
 
@@ -138,7 +138,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             case rtc::PeerConnection::SignalingState::Stable:
                 mState.peer_connection.signaling_state = Stable;
             default:
-                mState.peer_connection.signaling_state = NoSignaling;
+                break;
             }
         });
 
@@ -275,7 +275,7 @@ void Task::configureWebSocket()
     else
     {
         mWs.reset();
-        throw runtime_error("WebSocket open failed");
+        throw runtime_error("Timed out waiting for the websocket connection to be ready");
     }
 }
 
@@ -446,6 +446,7 @@ bool Task::startHook()
             }
             else if (base::Time::now() > deadline)
             {
+                _status.write(mState);
                 throw runtime_error("Timeout to get contact with the remote peer");
             }
         }
@@ -464,8 +465,11 @@ bool Task::startHook()
     }
     else
     {
+        _status.write(mState);
         throw runtime_error("Timeout to open datachannel");
     }
+
+    _status.write(mState);
 
     return true;
 }
@@ -495,7 +499,7 @@ void Task::stopHook()
         }
         else
         {
-            throw runtime_error("DataChannel close failed");
+            throw runtime_error("Timeout waiting for the data channel to close");
         }
     }
     if (mPeerConnection)
@@ -512,7 +516,7 @@ void Task::stopHook()
         }
         else
         {
-            throw runtime_error("Peer connection close failed");
+            throw runtime_error("Timeout waiting for the peer connection to close");
         }
     }
     mState = WebRTCState();
