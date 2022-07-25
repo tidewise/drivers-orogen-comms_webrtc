@@ -152,7 +152,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             message["data"]["from"] = _local_peer_id.get();
             message["data"]["description"] = string(description);
 
-            if (auto ws = make_weak_ptr(mWs).lock())
+            if (auto ws = make_weak_ptr(mWebSocket).lock())
             {
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
@@ -170,7 +170,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             message["data"]["candidate"] = string(candidate);
             message["data"]["mid"] = candidate.mid();
 
-            if (auto ws = make_weak_ptr(mWs).lock())
+            if (auto ws = make_weak_ptr(mWebSocket).lock())
             {
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
@@ -195,7 +195,7 @@ void Task::configureWebSocket()
     promise<void> ws_promise;
     future<void> ws_future = ws_promise.get_future();
 
-    mWs->onOpen(
+    mWebSocket->onOpen(
         [&]()
         {
             LOG_INFO_S << "WebSocket connected, signaling ready" << endl;
@@ -203,25 +203,27 @@ void Task::configureWebSocket()
             ws_promise.set_value();
         });
 
-    mWs->onError(
+    mWebSocket->onError(
         [&](const string &error)
         {
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
             mState.web_socket = WebSocketFailed;
             ws_promise.set_exception(make_exception_ptr(runtime_error(error)));
             mPeerConnectionClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
+            mWebSocketClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
             trigger();
         });
 
-    mWs->onClosed(
+    mWebSocket->onClosed(
         [&]()
         {
             LOG_INFO_S << "WebSocket closed" << endl;
             mState.web_socket = WebSocketClosed;
+            mWebSocketClosePromise.set_value();
             trigger();
         });
 
-    mWs->onMessage(
+    mWebSocket->onMessage(
         [&](variant<binary, string> data)
         {
             if (!holds_alternative<string>(data))
@@ -265,7 +267,7 @@ void Task::configureWebSocket()
 
     // wss://signalserverhost?user=yourname
     const string url = _signaling_server_name.get() + "?user=" + _local_peer_id.get();
-    mWs->open(url);
+    mWebSocket->open(url);
     future_status status =
         ws_future.wait_for(chrono::microseconds(_wait_remote_peer_time_out.get().toMicroseconds()));
     if (status == future_status::ready)
@@ -274,7 +276,7 @@ void Task::configureWebSocket()
     }
     else
     {
-        mWs.reset();
+        mWebSocket.reset();
         throw runtime_error("Timed out waiting for the websocket connection to be ready");
     }
 }
@@ -287,7 +289,7 @@ void Task::ping()
     message["action"] = "ping";
     message["data"]["from"] = _local_peer_id.get();
     Json::FastWriter fast;
-    if (auto ws = make_weak_ptr(mWs).lock())
+    if (auto ws = make_weak_ptr(mWebSocket).lock())
     {
         ws->send(fast.write(message));
     }
@@ -301,7 +303,7 @@ void Task::pong()
     message["action"] = "pong";
     message["data"]["from"] = _local_peer_id.get();
     Json::FastWriter fast;
-    if (auto ws = make_weak_ptr(mWs).lock())
+    if (auto ws = make_weak_ptr(mWebSocket).lock())
     {
         ws->send(fast.write(message));
     }
@@ -419,7 +421,7 @@ bool Task::configureHook()
         return false;
 
     mConfig.iceServers.emplace_back(_stun_server.get());
-    mWs = make_shared<rtc::WebSocket>();
+    mWebSocket = make_shared<rtc::WebSocket>();
 
     configureWebSocket();
 
@@ -495,10 +497,12 @@ void Task::stopHook()
             dc_close_future.wait_for(chrono::microseconds(_data_channel_time_out.get().toMicroseconds()));
         if (status == future_status::ready)
         {
+            mState.data_channel = NoDataChannel;
             dc_close_future.get();
         }
         else
         {
+            _status.write(mState);
             throw runtime_error("Timeout waiting for the data channel to close");
         }
     }
@@ -512,16 +516,44 @@ void Task::stopHook()
             pc_close_future.wait_for(chrono::microseconds(_peer_connection_time_out.get().toMicroseconds()));
         if (status == future_status::ready)
         {
+            mState.peer_connection = PeerConnectionState();
             pc_close_future.get();
         }
         else
         {
+            _status.write(mState);
             throw runtime_error("Timeout waiting for the peer connection to close");
         }
     }
-    mState = WebRTCState();
+    if(mWebSocket->isOpen())
+    {
+        // Wait for the websocket close
+        future<void> ws_close_future = mWebSocketClosePromise.get_future();
+        mWebSocket->close();
+        // check timeout
+        future_status status =
+            ws_close_future.wait_for(chrono::microseconds(_websocket_time_out.get().toMicroseconds()));
+        if (status == future_status::ready)
+        {
+            ws_close_future.get();
+        }
+        else
+        {
+            _status.write(mState);
+            throw runtime_error("Timeout waiting for the web socket to close");
+        }
+    }
+
     _status.write(mState);
 
     TaskBase::stopHook();
 }
-void Task::cleanupHook() { TaskBase::cleanupHook(); }
+void Task::cleanupHook()
+{
+    if (mWebSocket)
+    {
+        mWebSocket.reset();
+    }
+
+    TaskBase::cleanupHook();
+}

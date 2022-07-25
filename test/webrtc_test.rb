@@ -40,7 +40,7 @@ describe OroGen.comms_webrtc.Task do
         @task1.properties.data_channel_time_out = time_out
         @task1.properties.peer_connection_time_out = time_out
         @task1.properties.wait_remote_peer_time_out = time_out
-        @task1.properties.websocket_open_time_out = time_out
+        @task1.properties.websocket_time_out = time_out
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"
         @task1.properties.local_peer_id = task_a.to_s
         @task1.properties.remote_peer_id = task_b.to_s
@@ -53,7 +53,7 @@ describe OroGen.comms_webrtc.Task do
         @task2.properties.data_channel_time_out = time_out
         @task2.properties.peer_connection_time_out = time_out
         @task2.properties.wait_remote_peer_time_out = time_out
-        @task2.properties.websocket_open_time_out = time_out
+        @task2.properties.websocket_time_out = time_out
         @task2.properties.stun_server = "stun:stun.l.google.com:19302"
         @task2.properties.local_peer_id = task_b.to_s
         @task2.properties.remote_peer_id = ""
@@ -120,7 +120,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "successfully reestablishes connection after a stop/start cycle" do
-        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
+        deploy("task_a", "task_b", Time.at(10), "127.0.0.1:3012")
         configure_and_start
 
         expect_execution do
@@ -131,7 +131,7 @@ describe OroGen.comms_webrtc.Task do
             emit task2.stop_event
         end
 
-        deploy("task_c", "task_d", Time.at(5), "127.0.0.1:3012")
+        deploy("task_c", "task_d", Time.at(10), "127.0.0.1:3012")
         configure_and_start
     end
 
@@ -144,7 +144,7 @@ describe OroGen.comms_webrtc.Task do
         state_task.peer_connection.gathering_state = :NoGathering
         state_task.peer_connection.signaling_state = :NoSignaling
         state_task.data_channel = :NoDataChannel
-        state_task.web_socket = :NoWebSocket
+        state_task.web_socket = :WebSocketClosed
 
         state = expect_execution do
             task1.stop!

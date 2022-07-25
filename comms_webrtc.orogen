@@ -15,8 +15,8 @@ task_context "Task" do
     # Timeout to wait for a remote peer answer
     property "wait_remote_peer_time_out", "base/Time"
 
-    # Timeout to wait for the websocket open
-    property "websocket_open_time_out", "base/Time"
+    # Timeout to wait for the websocket open/close
+    property "websocket_time_out", "base/Time"
 
     # Timeout to wait for the peerconnection open/close
     property "peer_connection_time_out", "base/Time"
