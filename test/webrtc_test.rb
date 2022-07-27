@@ -11,24 +11,20 @@ describe OroGen.comms_webrtc.Task do
 
     before do
         timeout = Time.now + 1
+        @rustysignal_pid = Process.spawn("rustysignal", "127.0.0.1:3012")
         while Time.now < timeout
             begin
-                @rustysignal_pid = Process.spawn("rustysignal", "127.0.0.1:3012")
+                TCPSocket.open("127.0.0.1", 3012)
                 break
             rescue Errno::ECONNREFUSED
                 sleep(0.01)
             end
         end
-        if @rustysignal_pid.nil?
-            raise "Timeout to start rustysignal"
-        end
     end
 
     after do
-        unless @rustysignal_pid.nil?
-            Process.kill("KILL", @rustysignal_pid)
-            Process.waitpid @rustysignal_pid
-        end
+        Process.kill("KILL", @rustysignal_pid)
+        Process.waitpid @rustysignal_pid
     end
 
     def deploy(task_a, task_b, time_out, server_name)
@@ -90,7 +86,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "transmits data from the active to the passive task once started" do
-        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         data_in = Types.iodrivers_base.RawPacket.new
@@ -105,7 +101,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "transmits data from the passive to the active task once started" do
-        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         data_in_task2 = Types.iodrivers_base.RawPacket.new
@@ -120,7 +116,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     it "successfully reestablishes connection after a stop/start cycle" do
-        deploy("task_a", "task_b", Time.at(10), "127.0.0.1:3012")
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         expect_execution do
@@ -131,12 +127,12 @@ describe OroGen.comms_webrtc.Task do
             emit task2.stop_event
         end
 
-        deploy("task_c", "task_d", Time.at(10), "127.0.0.1:3012")
+        deploy("task_c", "task_d", Time.at(2), "127.0.0.1:3012")
         configure_and_start
     end
 
     it "disconnects the WebRTC connection on stop" do
-        deploy("task_a", "task_b", Time.at(5), "127.0.0.1:3012")
+        deploy("task_a", "task_b", Time.at(2), "127.0.0.1:3012")
         configure_and_start
 
         state_task = Types.comms_webrtc.WebRTCState.new
