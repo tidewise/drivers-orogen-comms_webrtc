@@ -62,12 +62,6 @@ namespace comms_webrtc
             return jdata["data"]["candidate"].asString();
         }
 
-        std::string getMid()
-        {
-            validateFieldPresent(jdata, "data");
-            validateFieldPresent(jdata["data"], "mid");
-            return jdata["data"]["mid"].asString();
-        }
     };
 }
 
