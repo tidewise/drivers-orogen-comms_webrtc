@@ -47,10 +47,14 @@ void Task::onAnswer()
 void Task::onCandidate()
 {
     string candidate = mDecoder.getCandidate();
-
+    string mid;
+    if (mDecoder.isMidFieldPresent())
+    {
+        mid = mDecoder.getMid();
+    }
     try
     {
-        mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate));
+        mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate, mid));
     }
     catch (logic_error const& error)
     {
@@ -170,6 +174,7 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
             message["action"] = "candidate";
             message["data"]["from"] = _local_peer_id.get();
             message["data"]["candidate"] = string(candidate);
+            message["data"]["mid"] = candidate.mid();
 
             if (auto ws = make_weak_ptr(mWebSocket).lock())
             {
