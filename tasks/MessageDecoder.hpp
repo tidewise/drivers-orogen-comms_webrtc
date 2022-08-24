@@ -1,9 +1,9 @@
 #ifndef COMMS_WEBRTC_MESSAGE_DECODER_HPP
 #define COMMS_WEBRTC_MESSAGE_DECODER_HPP
 
-#include "json/json.h"
 #include "stdio.h"
 #include "string.h"
+#include "json/json.h"
 
 namespace comms_webrtc
 {
@@ -15,17 +15,18 @@ namespace comms_webrtc
 
         MessageDecoder() : reader(rbuilder.newCharReader()) {}
 
-        bool parseJSONMessage(char const *data, std::string &errors)
+        bool parseJSONMessage(char const* data, std::string& errors)
         {
             return reader->parse(data, data + strlen(data), &jdata, &errors);
         }
 
-        void validateFieldPresent(Json::Value const &value, std::string const &fieldName)
+        void validateFieldPresent(Json::Value const& value, std::string const& fieldName)
         {
             if (!value.isMember(fieldName))
             {
                 throw std::invalid_argument(
-                    "message does not contain the " + fieldName + " field");
+                    "message does not contain the " + fieldName + " field"
+                );
             }
         }
 
@@ -62,13 +63,10 @@ namespace comms_webrtc
             return jdata["data"]["candidate"].asString();
         }
 
-        std::string getMid()
-        {
-            validateFieldPresent(jdata, "data");
-            validateFieldPresent(jdata["data"], "mid");
-            return jdata["data"]["mid"].asString();
-        }
+        bool isMidFieldPresent() { return jdata.isMember("mid"); }
+
+        std::string getMid() { return jdata["data"]["mid"].asString(); }
     };
-}
+} // namespace comms_webrtc
 
 #endif

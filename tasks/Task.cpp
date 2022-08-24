@@ -8,8 +8,7 @@ using namespace std::this_thread;
 using namespace std;
 using namespace rtc;
 
-template <class T>
-weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
+template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr) { return ptr; }
 
 void Task::onOffer()
 {
@@ -21,7 +20,7 @@ void Task::onOffer()
     {
         mPeerConnection->setRemoteDescription(rtc::Description(description, "offer"));
     }
-    catch (const logic_error &error)
+    catch (logic_error const& error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
@@ -37,7 +36,7 @@ void Task::onAnswer()
     {
         mPeerConnection->setRemoteDescription(rtc::Description(description, "answer"));
     }
-    catch (const logic_error &error)
+    catch (logic_error const& error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
@@ -47,14 +46,17 @@ void Task::onAnswer()
 
 void Task::onCandidate()
 {
-    string mid = mDecoder.getMid();
     string candidate = mDecoder.getCandidate();
-
+    string mid;
+    if (mDecoder.isMidFieldPresent())
+    {
+        mid = mDecoder.getMid();
+    }
     try
     {
         mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate, mid));
     }
-    catch (const logic_error &error)
+    catch (logic_error const& error)
     {
         mPeerConnection.reset();
         LOG_ERROR_S << error.what();
@@ -62,7 +64,7 @@ void Task::onCandidate()
     }
 }
 
-void Task::parseIncomingMessage(char const *data)
+void Task::parseIncomingMessage(char const* data)
 {
     string error;
     if (!mDecoder.parseJSONMessage(data, error))
@@ -86,61 +88,64 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
         {
             switch (state)
             {
-            case rtc::PeerConnection::State::Disconnected:
-                mState.peer_connection.state = Disconnected;
-            case rtc::PeerConnection::State::Closed:
-            {
-                mState.peer_connection.state = Closed;
-                mPeerConnectionClosePromise.set_value();
+                case rtc::PeerConnection::State::Disconnected:
+                    mState.peer_connection.state = Disconnected;
+                case rtc::PeerConnection::State::Closed:
+                {
+                    mState.peer_connection.state = Closed;
+                    mPeerConnectionClosePromise.set_value();
+                }
+                case rtc::PeerConnection::State::Connected:
+                    mState.peer_connection.state = Connected;
+                case rtc::PeerConnection::State::Connecting:
+                    mState.peer_connection.state = Connecting;
+                case rtc::PeerConnection::State::Failed:
+                    mState.peer_connection.state = Failed;
+                case rtc::PeerConnection::State::New:
+                    mState.peer_connection.state = NewConnection;
+                default:
+                    break;
             }
-            case rtc::PeerConnection::State::Connected:
-                mState.peer_connection.state = Connected;
-            case rtc::PeerConnection::State::Connecting:
-                mState.peer_connection.state = Connecting;
-            case rtc::PeerConnection::State::Failed:
-                mState.peer_connection.state = Failed;
-            case rtc::PeerConnection::State::New:
-                mState.peer_connection.state = NewConnection;
-            default:
-                break;
-            }
-        });
+        }
+    );
 
     peer_connection->onGatheringStateChange(
         [&](rtc::PeerConnection::GatheringState state)
         {
             switch (state)
             {
-            case rtc::PeerConnection::GatheringState::Complete:
-                mState.peer_connection.gathering_state = Complete;
-            case rtc::PeerConnection::GatheringState::InProgress:
-                mState.peer_connection.gathering_state = InProgress;
-            case rtc::PeerConnection::GatheringState::New:
-                mState.peer_connection.gathering_state = NewGathering;
-            default:
-                break;
+                case rtc::PeerConnection::GatheringState::Complete:
+                    mState.peer_connection.gathering_state = Complete;
+                case rtc::PeerConnection::GatheringState::InProgress:
+                    mState.peer_connection.gathering_state = InProgress;
+                case rtc::PeerConnection::GatheringState::New:
+                    mState.peer_connection.gathering_state = NewGathering;
+                default:
+                    break;
             }
-        });
+        }
+    );
 
     peer_connection->onSignalingStateChange(
         [&](rtc::PeerConnection::SignalingState state)
         {
             switch (state)
             {
-            case rtc::PeerConnection::SignalingState::HaveLocalOffer:
-                mState.peer_connection.signaling_state = HaveLocalOffer;
-            case rtc::PeerConnection::SignalingState::HaveLocalPranswer:
-                mState.peer_connection.signaling_state = HaveLocalPranswer;
-            case rtc::PeerConnection::SignalingState::HaveRemoteOffer:
-                mState.peer_connection.signaling_state = HaveRemoteOffer;
-            case rtc::PeerConnection::SignalingState::HaveRemotePranswer:
-                mState.peer_connection.signaling_state = HaveRemotePranswer;
-            case rtc::PeerConnection::SignalingState::Stable:
-                mState.peer_connection.signaling_state = Stable;
-            default:
-                break;
+                case rtc::PeerConnection::SignalingState::HaveLocalOffer:
+                    mState.peer_connection.signaling_state = HaveLocalOffer;
+                case rtc::PeerConnection::SignalingState::HaveLocalPranswer:
+                    mState.peer_connection.signaling_state = HaveLocalPranswer;
+                case rtc::PeerConnection::SignalingState::HaveRemoteOffer:
+                    mState.peer_connection.signaling_state = HaveRemoteOffer;
+                case rtc::PeerConnection::SignalingState::HaveRemotePranswer:
+                    mState.peer_connection.signaling_state = HaveRemotePranswer;
+                case rtc::PeerConnection::SignalingState::Stable:
+                    mState.peer_connection.signaling_state = Stable;
+                default:
+                    break;
             }
-        });
+        }
+    );
 
     peer_connection->onLocalDescription(
         [&](rtc::Description description)
@@ -157,7 +162,8 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
             }
-        });
+        }
+    );
 
     peer_connection->onLocalCandidate(
         [&](rtc::Candidate candidate)
@@ -175,7 +181,8 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
                 Json::FastWriter fast;
                 ws->send(fast.write(message));
             }
-        });
+        }
+    );
 
     return peer_connection;
 }
@@ -187,7 +194,8 @@ void Task::configurePeerDataChannel()
         {
             mDataChannel = data_channel;
             registerDataChannelCallBacks(data_channel);
-        });
+        }
+    );
 }
 
 void Task::configureWebSocket()
@@ -201,18 +209,23 @@ void Task::configureWebSocket()
             LOG_INFO_S << "WebSocket connected, signaling ready" << endl;
             mState.web_socket = WebSocketOpened;
             ws_promise.set_value();
-        });
+        }
+    );
 
     mWebSocket->onError(
-        [&](const string &error)
+        [&](string const& error)
         {
             LOG_ERROR_S << "WebSocket failed: " << error << endl;
             mState.web_socket = WebSocketFailed;
             ws_promise.set_exception(make_exception_ptr(runtime_error(error)));
-            mPeerConnectionClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
-            mWebSocketClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
+            mPeerConnectionClosePromise.set_exception(
+                make_exception_ptr(runtime_error(error))
+            );
+            mWebSocketClosePromise.set_exception(make_exception_ptr(runtime_error(error))
+            );
             trigger();
-        });
+        }
+    );
 
     mWebSocket->onClosed(
         [&]()
@@ -221,7 +234,8 @@ void Task::configureWebSocket()
             mState.web_socket = WebSocketClosed;
             mWebSocketClosePromise.set_value();
             trigger();
-        });
+        }
+    );
 
     mWebSocket->onMessage(
         [&](variant<binary, string> data)
@@ -247,7 +261,8 @@ void Task::configureWebSocket()
                 else
                 {
                     mWaitRemotePeerPromise.set_exception(
-                        make_exception_ptr(runtime_error("Remote peer unreachable")));
+                        make_exception_ptr(runtime_error("Remote peer unreachable"))
+                    );
                 }
             }
 
@@ -263,13 +278,15 @@ void Task::configureWebSocket()
             {
                 onCandidate();
             }
-        });
+        }
+    );
 
     // wss://signalserverhost?user=yourname
     const string url = _signaling_server_name.get() + "?user=" + _local_peer_id.get();
     mWebSocket->open(url);
-    future_status status =
-        ws_future.wait_for(chrono::microseconds(_wait_remote_peer_time_out.get().toMicroseconds()));
+    future_status status = ws_future.wait_for(
+        chrono::microseconds(_wait_remote_peer_time_out.get().toMicroseconds())
+    );
     if (status == future_status::ready)
     {
         ws_future.get();
@@ -311,25 +328,27 @@ void Task::pong()
 
 void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel)
 {
-    LOG_INFO_S << "DataChannel from " << mRemotePeerID
-               << " received with label \"" << data_channel->label() << "\""
-               << endl;
+    LOG_INFO_S << "DataChannel from " << mRemotePeerID << " received with label \""
+               << data_channel->label() << "\"" << endl;
     data_channel->onOpen(
         [&]()
         {
             mState.data_channel = DataChannelOpened;
             mDataChannelPromise.set_value();
-        });
+        }
+    );
 
     data_channel->onError(
-        [&](const string &error)
+        [&](string const& error)
         {
             LOG_ERROR_S << "DataChannel failed: " << error << endl;
             mState.data_channel = DataChannelFailed;
             mDataChannelPromise.set_exception(make_exception_ptr(runtime_error(error)));
-            mDataChannelClosePromise.set_exception(make_exception_ptr(runtime_error(error)));
+            mDataChannelClosePromise.set_exception(make_exception_ptr(runtime_error(error)
+            ));
             trigger();
-        });
+        }
+    );
 
     data_channel->onClosed(
         [&]()
@@ -338,7 +357,8 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
             mState.data_channel = DataChannelClosed;
             mDataChannelClosePromise.set_value();
             trigger();
-        });
+        }
+    );
 
     data_channel->onMessage(
         [&](variant<binary, string> data)
@@ -363,34 +383,37 @@ void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channe
                 }
             }
             _data_out.write(dataPacket);
-        });
+        }
+    );
 }
 
 void Task::evaluateDataChannel()
 {
     switch (mState.data_channel)
     {
-    case DataChannelOpened:
-    {
-        iodrivers_base::RawPacket raw_packet;
-        if (_data_in.read(raw_packet) != RTT::NewData)
-            return;
-
-        vector<byte> data;
-        data.resize(raw_packet.data.size());
-        for (unsigned int i = 0; i < raw_packet.data.size(); i++)
+        case DataChannelOpened:
         {
-            data[i] = static_cast<byte>(raw_packet.data[i]);
+            iodrivers_base::RawPacket raw_packet;
+            if (_data_in.read(raw_packet) != RTT::NewData)
+            {
+                return;
+            }
+
+            vector<byte> data;
+            data.resize(raw_packet.data.size());
+            for (unsigned int i = 0; i < raw_packet.data.size(); i++)
+            {
+                data[i] = static_cast<byte>(raw_packet.data[i]);
+            }
+            mDataChannel->send(&data.front(), data.size());
+            break;
         }
-        mDataChannel->send(&data.front(), data.size());
-        break;
-    }
-    case DataChannelClosed:
-        throw runtime_error("DataChannel closed");
-    case DataChannelFailed:
-        throw runtime_error("DataChannel failed");
-    default:
-        break;
+        case DataChannelClosed:
+            throw runtime_error("DataChannel closed");
+        case DataChannelFailed:
+            throw runtime_error("DataChannel failed");
+        default:
+            break;
     }
 }
 
@@ -398,16 +421,16 @@ void Task::evaluateWebSocket()
 {
     switch (mState.web_socket)
     {
-    case WebSocketClosed:
-        throw runtime_error("WebSocket closed");
-    case WebSocketFailed:
-        throw runtime_error("WebSocket failed");
-    default:
-        break;
+        case WebSocketClosed:
+            throw runtime_error("WebSocket closed");
+        case WebSocketFailed:
+            throw runtime_error("WebSocket failed");
+        default:
+            break;
     }
 }
 
-Task::Task(string const &name) : TaskBase(name) {}
+Task::Task(string const& name) : TaskBase(name) {}
 
 Task::~Task() {}
 
@@ -418,7 +441,9 @@ Task::~Task() {}
 bool Task::configureHook()
 {
     if (!TaskBase::configureHook())
+    {
         return false;
+    }
 
     mConfig.iceServers.emplace_back(_stun_server.get());
     mWebSocket = make_shared<rtc::WebSocket>();
@@ -430,7 +455,9 @@ bool Task::configureHook()
 bool Task::startHook()
 {
     if (!TaskBase::startHook())
+    {
         return false;
+    }
 
     if (!_remote_peer_id.get().empty())
     {
@@ -459,8 +486,9 @@ bool Task::startHook()
     }
     future<void> dc_future = mDataChannelPromise.get_future();
     // check datachannel timeout
-    future_status status =
-        dc_future.wait_for(chrono::microseconds(_data_channel_time_out.get().toMicroseconds()));
+    future_status status = dc_future.wait_for(
+        chrono::microseconds(_data_channel_time_out.get().toMicroseconds())
+    );
     if (status == future_status::ready)
     {
         dc_future.get();
@@ -493,8 +521,9 @@ void Task::stopHook()
         // Try to close datachannel
         mDataChannel.reset();
         // check timeout
-        future_status status =
-            dc_close_future.wait_for(chrono::microseconds(_data_channel_time_out.get().toMicroseconds()));
+        future_status status = dc_close_future.wait_for(
+            chrono::microseconds(_data_channel_time_out.get().toMicroseconds())
+        );
         if (status == future_status::ready)
         {
             mState.data_channel = NoDataChannel;
@@ -512,8 +541,9 @@ void Task::stopHook()
         // Try to close peerconnection
         mPeerConnection.reset();
         // check timeout
-        future_status status =
-            pc_close_future.wait_for(chrono::microseconds(_peer_connection_time_out.get().toMicroseconds()));
+        future_status status = pc_close_future.wait_for(
+            chrono::microseconds(_peer_connection_time_out.get().toMicroseconds())
+        );
         if (status == future_status::ready)
         {
             mState.peer_connection = PeerConnectionState();
@@ -525,14 +555,15 @@ void Task::stopHook()
             throw runtime_error("Timeout waiting for the peer connection to close");
         }
     }
-    if(mWebSocket->isOpen())
+    if (mWebSocket->isOpen())
     {
         // Wait for the websocket close
         future<void> ws_close_future = mWebSocketClosePromise.get_future();
         mWebSocket->close();
         // check timeout
-        future_status status =
-            ws_close_future.wait_for(chrono::microseconds(_websocket_time_out.get().toMicroseconds()));
+        future_status status = ws_close_future.wait_for(
+            chrono::microseconds(_websocket_time_out.get().toMicroseconds())
+        );
         if (status == future_status::ready)
         {
             ws_close_future.get();
