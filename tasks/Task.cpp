@@ -364,18 +364,20 @@ bool Task::configureHook()
         return false;
     }
 
-    mConfig.iceServers.emplace_back(_stun_server.get());
+    mDataChannelPromise = std::promise<void>();
+    mWebSocketClosePromise = std::promise<void>();
+    mWaitRemotePeerPromise = std::promise<void>();
+    mDataChannelClosePromise = std::promise<void>();
+    mPeerConnectionClosePromise = std::promise<void>();
+
+    rtcInitLogger(RTC_LOG_DEBUG, nullptr);
+
+    mConfig.iceServers.emplace_back("stun:stun.services.mozilla.com");
+    mConfig.iceServers.emplace_back("stun:stun.stunprotocol.org");
+    mConfig.iceServers.emplace_back("stun:stun.l.google.com:19302");
     mWebSocket = make_shared<rtc::WebSocket>();
 
     configureWebSocket();
-
-    return true;
-}
-bool Task::startHook()
-{
-    if (!TaskBase::startHook()) {
-        return false;
-    }
 
     if (!_remote_peer_id.get().empty()) {
         mRemotePeerID = _remote_peer_id.get();
@@ -414,6 +416,14 @@ bool Task::startHook()
 
     return true;
 }
+bool Task::startHook()
+{
+    if (!TaskBase::startHook()) {
+        return false;
+    }
+
+    return true;
+}
 void Task::updateHook()
 {
     _status.write(mState);
@@ -428,6 +438,10 @@ void Task::errorHook()
     TaskBase::errorHook();
 }
 void Task::stopHook()
+{
+    TaskBase::stopHook();
+}
+void Task::cleanupHook()
 {
     if (mDataChannel) {
         future<void> dc_close_future = mDataChannelClosePromise.get_future();
@@ -479,10 +493,6 @@ void Task::stopHook()
 
     _status.write(mState);
 
-    TaskBase::stopHook();
-}
-void Task::cleanupHook()
-{
     if (mWebSocket) {
         mWebSocket.reset();
     }
