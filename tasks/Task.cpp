@@ -234,6 +234,7 @@ void Task::configureWebSocket()
         chrono::microseconds(_wait_remote_peer_time_out.get().toMicroseconds()));
     if (status == future_status::ready) {
         ws_future.get();
+        send("open", Json::Value());
     }
     else {
         mWebSocket.reset();
