@@ -158,6 +158,10 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
 void Task::configurePeerDataChannel()
 {
     mPeerConnection->onDataChannel([&](shared_ptr<rtc::DataChannel> data_channel) {
+        if (data_channel->label() != _data_channel_label.get()) {
+            return;
+        }
+
         mDataChannel = data_channel;
         registerDataChannelCallBacks(data_channel);
     });
@@ -379,7 +383,7 @@ bool Task::configureHook()
 
     configureWebSocket();
 
-    if (!_remote_peer_id.get().empty()) {
+    if (!_passive.get()) {
         mRemotePeerID = _remote_peer_id.get();
         future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
         // Try to get contact with the remote peer and create datachannel
