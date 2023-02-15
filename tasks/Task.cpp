@@ -211,10 +211,6 @@ void Task::configureWebSocket()
                 m_announced_peer = true;
                 mWaitRemotePeerPromise.set_value();
             }
-            else {
-                mWaitRemotePeerPromise.set_exception(
-                    make_exception_ptr(runtime_error("Remote peer unreachable")));
-            }
         }
 
         else if (actiontype == "offer") {
