@@ -158,6 +158,10 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
 void Task::configurePeerDataChannel()
 {
     mPeerConnection->onDataChannel([&](shared_ptr<rtc::DataChannel> data_channel) {
+        if (data_channel->label() != _data_channel_label.get()) {
+            return;
+        }
+
         mDataChannel = data_channel;
         registerDataChannelCallBacks(data_channel);
     });
