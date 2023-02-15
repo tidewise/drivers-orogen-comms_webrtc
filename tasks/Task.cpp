@@ -203,7 +203,7 @@ void Task::configureWebSocket()
         parseIncomingMessage(get<string>(data));
         string actiontype = mDecoder.getActionType();
 
-        if (actiontype == "ping") {
+        if (actiontype == "ping" && _remote_peer_id.get() == mDecoder.getFrom()) {
             pong();
         }
         if (actiontype == "pong") {
