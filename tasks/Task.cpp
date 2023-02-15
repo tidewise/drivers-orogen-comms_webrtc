@@ -41,10 +41,7 @@ void Task::onAnswer()
 void Task::onCandidate()
 {
     string candidate = mDecoder.getCandidate();
-    string mid;
-    if (mDecoder.isMidFieldPresent()) {
-        mid = mDecoder.getMid();
-    }
+    string mid = mDecoder.getMid();
     try {
         mPeerConnection->addRemoteCandidate(rtc::Candidate(candidate, mid));
     }
