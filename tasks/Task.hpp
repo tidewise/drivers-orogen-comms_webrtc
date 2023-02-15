@@ -110,6 +110,7 @@ namespace comms_webrtc {
         comms_webrtc::MessageDecoder mDecoder;
         std::promise<void> mDataChannelPromise;
         std::promise<void> mWebSocketClosePromise;
+        bool m_announced_peer = false;
         std::promise<void> mWaitRemotePeerPromise;
         std::promise<void> mDataChannelClosePromise;
         std::promise<void> mPeerConnectionClosePromise;
