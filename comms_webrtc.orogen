@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 name "comms_webrtc"
 # Optionally declare the version number
 # version "0.1"
