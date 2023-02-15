@@ -40,6 +40,7 @@ describe OroGen.comms_webrtc.Task do
         @task1.properties.stun_server = "stun:stun.l.google.com:19302"
         @task1.properties.local_peer_id = task_a.to_s
         @task1.properties.remote_peer_id = task_b.to_s
+        @task1.properties.passive = false
         @task1.properties.data_channel_label = "test_data_label"
         @task1.properties.signaling_server_name = server_name
 
@@ -52,7 +53,8 @@ describe OroGen.comms_webrtc.Task do
         @task2.properties.websocket_time_out = time_out
         @task2.properties.stun_server = "stun:stun.l.google.com:19302"
         @task2.properties.local_peer_id = task_b.to_s
-        @task2.properties.remote_peer_id = ""
+        @task2.properties.remote_peer_id = task_a.to_s
+        @task1.properties.passive = true
         @task2.properties.data_channel_label = "test_data_label"
         @task2.properties.signaling_server_name = server_name
     end

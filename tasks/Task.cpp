@@ -379,7 +379,7 @@ bool Task::configureHook()
 
     configureWebSocket();
 
-    if (!_remote_peer_id.get().empty()) {
+    if (!_passive.get()) {
         mRemotePeerID = _remote_peer_id.get();
         future<void> wait_remote_peer_future = mWaitRemotePeerPromise.get_future();
         // Try to get contact with the remote peer and create datachannel
