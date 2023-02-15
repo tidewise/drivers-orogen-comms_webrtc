@@ -206,8 +206,9 @@ void Task::configureWebSocket()
         if (actiontype == "ping" && _remote_peer_id.get() == mDecoder.getFrom()) {
             pong();
         }
-        if (actiontype == "pong") {
-            if (_remote_peer_id.get() == mDecoder.getFrom()) {
+        else if (actiontype == "pong") {
+            if (!m_announced_peer && _remote_peer_id.get() == mDecoder.getFrom()) {
+                m_announced_peer = true;
                 mWaitRemotePeerPromise.set_value();
             }
             else {
@@ -216,7 +217,7 @@ void Task::configureWebSocket()
             }
         }
 
-        if (actiontype == "offer") {
+        else if (actiontype == "offer") {
             onOffer();
         }
         else if (actiontype == "answer") {
@@ -374,6 +375,7 @@ bool Task::configureHook()
     mWaitRemotePeerPromise = std::promise<void>();
     mDataChannelClosePromise = std::promise<void>();
     mPeerConnectionClosePromise = std::promise<void>();
+    m_announced_peer = false;
 
     rtcInitLogger(RTC_LOG_DEBUG, nullptr);
 
