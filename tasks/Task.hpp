@@ -117,6 +117,7 @@ namespace comms_webrtc {
         std::shared_ptr<rtc::DataChannel> mDataChannel;
         std::shared_ptr<rtc::PeerConnection> mPeerConnection;
 
+        void send(std::string const& action, Json::Value const& data);
         void ping();
         void pong();
         void onAnswer();

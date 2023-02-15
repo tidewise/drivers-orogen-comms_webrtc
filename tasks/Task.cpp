@@ -8,11 +8,6 @@ using namespace std::this_thread;
 using namespace std;
 using namespace rtc;
 
-template <class T> weak_ptr<T> make_weak_ptr(shared_ptr<T> ptr)
-{
-    return ptr;
-}
-
 void Task::onOffer()
 {
     string description = mDecoder.getDescription();
@@ -139,10 +134,9 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
         message["data"]["from"] = _local_peer_id.get();
         message["data"]["description"] = string(description);
 
-        if (auto ws = make_weak_ptr(mWebSocket).lock()) {
-            Json::FastWriter fast;
-            ws->send(fast.write(message));
-        }
+
+        Json::FastWriter fast;
+        mWebSocket->send(fast.write(message));
     });
 
     peer_connection->onLocalCandidate([&](rtc::Candidate candidate) {
@@ -154,10 +148,8 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
         message["data"]["candidate"] = string(candidate);
         message["data"]["mid"] = candidate.mid();
 
-        if (auto ws = make_weak_ptr(mWebSocket).lock()) {
-            Json::FastWriter fast;
-            ws->send(fast.write(message));
-        }
+        Json::FastWriter fast;
+        mWebSocket->send(fast.write(message));
     });
 
     return peer_connection;
@@ -245,30 +237,29 @@ void Task::configureWebSocket()
     }
 }
 
-void Task::ping()
+void Task::send(std::string const& action, Json::Value const& data)
 {
     Json::Value message;
     message["protocol"] = "one-to-one";
     message["to"] = _remote_peer_id.get();
-    message["action"] = "ping";
-    message["data"]["from"] = _local_peer_id.get();
+    message["action"] = action;
+    message["data"] = data;
     Json::FastWriter fast;
-    if (auto ws = make_weak_ptr(mWebSocket).lock()) {
-        ws->send(fast.write(message));
-    }
+    mWebSocket->send(fast.write(message));
+}
+
+void Task::ping()
+{
+    Json::Value data;
+    data["from"] = _local_peer_id.get();
+    send("ping", data);
 }
 
 void Task::pong()
 {
-    Json::Value message;
-    message["protocol"] = "one-to-one";
-    message["to"] = mDecoder.getFrom();
-    message["action"] = "pong";
-    message["data"]["from"] = _local_peer_id.get();
-    Json::FastWriter fast;
-    if (auto ws = make_weak_ptr(mWebSocket).lock()) {
-        ws->send(fast.write(message));
-    }
+    Json::Value data;
+    data["from"] = _local_peer_id.get();
+    send("pong", data);
 }
 
 void Task::registerDataChannelCallBacks(shared_ptr<rtc::DataChannel> data_channel)
