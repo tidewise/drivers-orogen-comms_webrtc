@@ -1,9 +1,10 @@
 #ifndef COMMS_WEBRTC_MESSAGE_DECODER_HPP
 #define COMMS_WEBRTC_MESSAGE_DECODER_HPP
 
-#include "stdio.h"
-#include "string.h"
-#include "json/json.h"
+#include <json/json.h>
+#include <memory>
+#include <stdio.h>
+#include <string.h>
 
 namespace comms_webrtc {
     struct MessageDecoder {
@@ -16,9 +17,12 @@ namespace comms_webrtc {
         {
         }
 
-        bool parseJSONMessage(char const* data, std::string& errors)
+        bool parseJSONMessage(std::string const& data, std::string& errors)
         {
-            return reader->parse(data, data + strlen(data), &jdata, &errors);
+            return reader->parse(data.data(),
+                data.data() + data.length(),
+                &jdata,
+                &errors);
         }
 
         void validateFieldPresent(Json::Value const& value, std::string const& fieldName)

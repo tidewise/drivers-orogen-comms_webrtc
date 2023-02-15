@@ -126,7 +126,7 @@ namespace comms_webrtc {
         void createPeerConnection();
         void evaluateDataChannel();
         void evaluateWebSocket();
-        void parseIncomingMessage(char const* data);
+        void parseIncomingMessage(std::string const& data);
         void configurePeerDataChannel();
         void configureWebSocket();
         void registerDataChannelCallBacks(std::shared_ptr<rtc::DataChannel> data_channel);

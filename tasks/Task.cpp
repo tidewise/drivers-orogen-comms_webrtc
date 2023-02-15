@@ -55,7 +55,7 @@ void Task::onCandidate()
     }
 }
 
-void Task::parseIncomingMessage(char const* data)
+void Task::parseIncomingMessage(string const& data)
 {
     string error;
     if (!mDecoder.parseJSONMessage(data, error)) {
@@ -196,7 +196,7 @@ void Task::configureWebSocket()
             return;
         }
 
-        parseIncomingMessage(get<string>(data).c_str());
+        parseIncomingMessage(get<string>(data));
         string actiontype = mDecoder.getActionType();
 
         if (actiontype == "ping") {
