@@ -63,8 +63,7 @@ describe OroGen.comms_webrtc.Task do
     end
 
     def configure_and_start()
-        syskit_configure(task1)
-        syskit_configure(task2)
+        syskit_configure([task1, task2])
 
         output = expect_execution do
             task1.start!
