@@ -50,7 +50,8 @@ task_context "Task" do
     property "passive", "/bool", true
 
     # Rawdata in
-    input_port "data_in", "iodrivers_base/RawPacket"
+    input_port("data_in", "iodrivers_base/RawPacket")
+        .needs_reliable_connection
 
     # Rawdata out
     output_port "data_out", "iodrivers_base/RawPacket"

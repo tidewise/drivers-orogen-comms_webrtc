@@ -131,7 +131,6 @@ shared_ptr<rtc::PeerConnection> Task::initiatePeerConnection()
         message["data"]["from"] = _local_peer_id.get();
         message["data"]["description"] = string(description);
 
-
         Json::FastWriter fast;
         mWebSocket->send(fast.write(message));
     });
@@ -311,16 +310,14 @@ void Task::evaluateDataChannel()
     switch (mState.data_channel) {
         case DataChannelOpened: {
             iodrivers_base::RawPacket raw_packet;
-            if (_data_in.read(raw_packet) != RTT::NewData) {
-                return;
+            while (_data_in.read(raw_packet) == RTT::NewData) {
+                vector<byte> data;
+                data.resize(raw_packet.data.size());
+                for (unsigned int i = 0; i < raw_packet.data.size(); i++) {
+                    data[i] = static_cast<byte>(raw_packet.data[i]);
+                }
+                mDataChannel->send(&data.front(), data.size());
             }
-
-            vector<byte> data;
-            data.resize(raw_packet.data.size());
-            for (unsigned int i = 0; i < raw_packet.data.size(); i++) {
-                data[i] = static_cast<byte>(raw_packet.data[i]);
-            }
-            mDataChannel->send(&data.front(), data.size());
             break;
         }
         case DataChannelClosed:
