@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 name "comms_webrtc"
 # Optionally declare the version number
 # version "0.1"
@@ -35,14 +37,21 @@ task_context "Task" do
     # the riquired peer connection)
     property "remote_peer_id", "std/string"
 
-    # Data channel label (only needed if you intend to send an offer)
+    # Data channel label
+    #
+    # If passive is true, it is the name of the created channel. If false, the name
+    # of the channel we are expecting (will filter out other channels if they exist)
     property "data_channel_label", "std/string"
 
     # Websocket server name (e.g. 127.0.0.1:3012)
     property "signaling_server_name", "std/string"
 
+    # Whether this component should try to initiate the connection
+    property "passive", "/bool", true
+
     # Rawdata in
-    input_port "data_in", "iodrivers_base/RawPacket"
+    input_port("data_in", "iodrivers_base/RawPacket")
+        .needs_reliable_connection
 
     # Rawdata out
     output_port "data_out", "iodrivers_base/RawPacket"

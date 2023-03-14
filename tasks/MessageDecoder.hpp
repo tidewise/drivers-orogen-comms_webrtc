@@ -1,32 +1,35 @@
 #ifndef COMMS_WEBRTC_MESSAGE_DECODER_HPP
 #define COMMS_WEBRTC_MESSAGE_DECODER_HPP
 
-#include "stdio.h"
-#include "string.h"
-#include "json/json.h"
+#include <json/json.h>
+#include <memory>
+#include <stdio.h>
+#include <string.h>
 
-namespace comms_webrtc
-{
-    struct MessageDecoder
-    {
+namespace comms_webrtc {
+    struct MessageDecoder {
         Json::Value jdata;
         Json::CharReaderBuilder rbuilder;
         std::unique_ptr<Json::CharReader> const reader;
 
-        MessageDecoder() : reader(rbuilder.newCharReader()) {}
-
-        bool parseJSONMessage(char const* data, std::string& errors)
+        MessageDecoder()
+            : reader(rbuilder.newCharReader())
         {
-            return reader->parse(data, data + strlen(data), &jdata, &errors);
+        }
+
+        bool parseJSONMessage(std::string const& data, std::string& errors)
+        {
+            return reader->parse(data.data(),
+                data.data() + data.length(),
+                &jdata,
+                &errors);
         }
 
         void validateFieldPresent(Json::Value const& value, std::string const& fieldName)
         {
-            if (!value.isMember(fieldName))
-            {
+            if (!value.isMember(fieldName)) {
                 throw std::invalid_argument(
-                    "message does not contain the " + fieldName + " field"
-                );
+                    "message does not contain the " + fieldName + " field");
             }
         }
 
@@ -63,9 +66,15 @@ namespace comms_webrtc
             return jdata["data"]["candidate"].asString();
         }
 
-        bool isMidFieldPresent() { return jdata.isMember("mid"); }
+        bool isMidFieldPresent()
+        {
+            return jdata.isMember("mid");
+        }
 
-        std::string getMid() { return jdata["data"]["mid"].asString(); }
+        std::string getMid()
+        {
+            return jdata["data"]["mid"].asString();
+        }
     };
 } // namespace comms_webrtc
 
